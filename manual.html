@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>貼圖助手使用說明</title>
+<title>貼圖助手操作手冊</title>
 <link rel="icon" href="icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -25,12 +25,16 @@
   a.back{display:inline-block;margin-bottom:14px;color:var(--accent);font-weight:700;text-decoration:none;}
   code{background:#f1ede4;border-radius:5px;padding:1px 5px;font-size:13px;}
   .table-wrap{overflow-x:auto;}
+  .warn ul{margin:0;}
+  section h3{font-size:15px;margin:12px 0 4px;}
+  .manual-footer{text-align:center;color:var(--dim);font-size:13px;padding:10px 16px 40px;}
+  .manual-footer a{color:var(--accent);}
 </style>
 </head>
 <body>
 <main>
-  <a class="back" href="index.html">← 回到貼圖助手</a>
-  <h1>LINE 貼圖自動化助手：使用說明</h1>
+  <a class="back" href="index.html">← 回到貼圖助手</a>　<a class="back" href="#creator">創作者資料</a>
+  <h1>LINE 貼圖自動化助手：操作手冊</h1>
   <p class="sub">給一個主題和一張角色圖，產出 8／16／24 張符合 LINE Creators Market 規格的透明 PNG，打包成 ZIP 就能上傳。</p>
 
   <section>
@@ -132,9 +136,80 @@
   </section>
 
   <section>
+    <h2>加入主畫面（像 App 一樣開啟）</h2>
+    <ul>
+      <li><b>電腦（Chrome／Edge）</b>：按工具右上角「📲 加入主畫面」，或網址列右側的安裝圖示。</li>
+      <li><b>Android（Chrome）</b>：按「📲 加入主畫面」，或瀏覽器選單 →「加到主畫面」。</li>
+      <li><b>iPhone／iPad（Safari）</b>：點下方「分享」圖示 →「加入主畫面」。</li>
+      <li><b>Mac Safari 17 以上</b>：選單列「檔案」→「加入 Dock」。</li>
+    </ul>
+    <p>加入後會用獨立視窗開啟，資料、設定與金鑰跟瀏覽器版共用同一份。</p>
+  </section>
+
+  <section>
     <h2>專案存檔</h2>
     <p>右上角「儲存專案」會把主題、設定、台詞、參考圖和網格圖存成一個 .json 檔，「開啟專案」可以載回來繼續修改。檔案只存在你的電腦裡。</p>
   </section>
+  <section>
+    <h2>使用警語</h2>
+    <div class="warn">
+      <ul>
+        <li>本工具協助產生台詞、提示詞與切割檔案，<b>不保證作品能通過 LINE Creators Market 審核</b>。</li>
+        <li>角色參考圖必須是你自己創作或已取得授權的圖片；<b>不可使用他人的版權角色、商標或真人肖像</b>。</li>
+        <li>AI 生成的圖像可能與既有作品相似，上架前請自行確認沒有侵害著作權、商標權或肖像權。</li>
+        <li>AI 生圖的商用權利依各服務商（Google、OpenAI、OpenRouter 上的模型供應商）的使用條款而定，請自行查閱。</li>
+        <li>台詞請避免歧視、暴力、色情、政治或其他違反 LINE 審核準則的內容；AI 改寫的台詞也要自己再檢查一次。</li>
+        <li>按下 AI 功能時，提示詞與角色參考圖會直接送到你選擇的服務商官方 API；API 費用由你與服務商自行負擔。</li>
+        <li>所有設定、圖片與金鑰只存在你的瀏覽器本機；在公用電腦使用後，請清除瀏覽器資料。</li>
+        <li>規格檢查依 LINE 官方公開準則實作，LINE 若調整規格請以官方最新公告為準。</li>
+        <li>本工具與創作者不對使用本工具產出的內容、上架結果或任何因此產生的損失負責。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="creator">
+    <h2>創作者資料</h2>
+    <p><b>Mark Tsai（蔡豐全）</b>｜聯絡信箱：<a href="mailto:tsaimark@gmail.com">tsaimark@gmail.com</a></p>
+    <h3>專長</h3>
+    <p>銷售數據分析、AI 工具運用、政府補助計畫申請、創業、跨境電商</p>
+    <h3>證照</h3>
+    <ul>
+      <li>青創總會 創業輔導顧問師班（2013）</li>
+      <li>青創總會 網路行銷講師培訓班（2014）</li>
+      <li>阿里巴巴 P4P 認證講師（2016）</li>
+      <li>iCap 訓練規劃與評量職能基準課程（2017）</li>
+      <li>iCap 職能導向課程申請認證實作班（2023）</li>
+      <li>iPAS AI 應用規劃師－初級（2025）</li>
+      <li>新北市社會局社區數位陪伴員（2025）</li>
+    </ul>
+    <h3>經歷</h3>
+    <ul>
+      <li>勞動力發展署桃竹苗分署 創業顧問（2017－迄今）</li>
+      <li>勞動力發展署（北北基）小型企業人力提升計畫 顧問（2019－迄今）</li>
+      <li>勞動力發展署（桃竹苗）小型企業人力提升計畫 顧問（2019－迄今）</li>
+      <li>農業部農業科技司「科技農企業雙軸轉型躍升發展」科技計畫 業師（2025－2026）</li>
+      <li>勞動力發展署 企業人力資源提升計畫 審查委員（2024）</li>
+      <li>勞動力發展署 職前訓練評鑑計畫 委員（2022）</li>
+      <li>勞動部桃竹苗分署－桃竹苗區域運籌人力資源整合服務計畫 顧問（2022－2023）</li>
+      <li>經濟部中小企業處 SBIR 海選專案 評審委員（2019－2024）</li>
+      <li>勞動力發展署 數位學習課程清單審查會議 審查委員（2024－2025）</li>
+      <li>輔仁大學創新跨領域學院 課務委員（2024－2025）</li>
+      <li>台北市進出口商業同業公會 跨境電商生態村 顧問</li>
+      <li>台灣網商協會 顧問</li>
+      <li>中華職能開發策進會 顧問（2018－2020）</li>
+      <li>新北市汽車美容人員職業工會 顧問（2023－迄今）</li>
+      <li>中華網路行銷講師協會 顧問（2022－迄今）</li>
+      <li>新北市社企電商基地 輔導顧問（2018－2020）</li>
+      <li>阿里巴巴國際站平台 認證講師（2016）</li>
+      <li>巨匠電腦 跨境電子商務班 講師（2016－2017）</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>授權與使用限制</h2>
+    <p>本工具僅供<b>教學、課程及個人使用</b>，禁止未經授權公開發布、販售或商業化使用。如需其他用途，請先取得創作者授權。</p>
+  </section>
 </main>
+<footer class="manual-footer">製作：Mark Tsai（蔡豐全）｜<a href="mailto:tsaimark@gmail.com">tsaimark@gmail.com</a>｜<a href="index.html">回到貼圖助手</a><br><img src="https://visitor-badge.laobi.icu/badge?page_id=m255525.linestickerstudio.manual" alt="訪客次數" height="20" style="margin-top:8px;"></footer>
 </body>
 </html>

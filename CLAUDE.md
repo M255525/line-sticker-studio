@@ -8,6 +8,7 @@
 - OpenRouter 圖像：`chat/completions` 加 `modalities:["image","text"]` 與 `image_config.aspect_ratio`，圖片從 `choices[0].message.images[].image_url.url`（data URL）取出。模型 ID 用 `curl https://openrouter.ai/api/v1/models` 篩選 `output_modalities` 含 image 的模型來確認（2026-10-12 已確認）。假金鑰測試回 401，代表 CORS 和請求路徑都正常。
 - **步驟 1「產生提示詞」**（2026-10-12 加入）：`buildPhrasePrompt()`／`buildImagePrompt(b)` 同時給 API 呼叫和手動複製用；`promptCompact`（精簡版）會一併影響兩者。台詞回覆用 `applyPhraseReply(raw)` 匯入，`parseJsonArray` 可容忍前後的說明文字和 ```json 標記。條件改變時 `persistSettings` 會呼叫 `refreshShownPrompts` 重新產生已顯示的提示詞。「每批格數」`batchSize` 已從步驟 3 移到步驟 1。
 - 頂部跑馬燈共用工作區公告 GAS（滑鼠移入會暫停）。
+- 頁尾（2026-10-12）：使用警語（摘要＋`<details>` 完整警語，內容是貼圖專用的版權、肖像、審核、AI 商用條款、資料送往服務商）、創作者 Mark Tsai（蔡豐全）＋信箱、visitor-badge 訪客計數（`page_id=m255525.linestickerstudio`，手冊頁用 `.manual`）、授權限制。頂部按鈕是「📖 操作手冊」「📲 加入主畫面」。manual.html 有 `#creator` 創作者資料（與 company-digital-transformation-analyzer 手冊同一份）、使用警語、加入主畫面教學。SW 快取版本 v2。
 
 ## 架構重點
 - 預設值集中放在 `INTENTS`（24 個英文動作描述，順序＝常用優先序）、`LANG_MODES`（8 種語言，各 24 句台詞，跟 INTENTS 一一對應）、`STYLES`、`EXAGGERATION`、`KEYS`、`FONTS`、`GRID`（每批格數→欄列／Gemini aspectRatio／OpenAI size）。

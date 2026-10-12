@@ -37,7 +37,7 @@
   .brand h1{font-size:18px;margin:0;font-weight:900;letter-spacing:.5px;}
   .brand small{display:block;font-size:12px;color:var(--dim);font-weight:500;}
   .top-actions{display:flex;gap:6px;flex-wrap:wrap;}
-  main{max-width:1180px;margin:0 auto;padding:16px 16px 80px;}
+  main{max-width:1180px;margin:0 auto;padding:16px 16px 24px;}
   .btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:7px 12px;font:inherit;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
   .btn:hover{border-color:var(--accent);}
   .btn:disabled{opacity:.5;cursor:not-allowed;}
@@ -142,6 +142,16 @@
   .range-row output{min-width:34px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px;}
   .color-row{display:flex;gap:8px;align-items:center;}
   .color-row input[type=color]{width:44px;height:34px;border:1px solid var(--line);border-radius:8px;padding:2px;background:#fff;}
+  .site-footer{border-top:1px solid var(--line);background:#efeadf;margin-top:24px;}
+  .footer-inner{max-width:1180px;margin:0 auto;padding:22px 16px 30px;font-size:13px;color:var(--dim);}
+  .footer-inner a{color:var(--accent-dark);}
+  .disclaimer{line-height:1.75;margin-bottom:14px;}
+  .footer-more summary{cursor:pointer;font-weight:700;color:var(--accent-dark);margin-top:4px;display:inline-block;}
+  .footer-more p{margin:6px 0 0;}
+  .footer-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;}
+  .footer-links{display:flex;align-items:center;gap:10px;}
+  .visitor-badge{vertical-align:middle;height:20px;}
+  .footer-license{margin:10px 0 0;font-size:12px;}
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#2b2622;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:all .2s;z-index:3000;max-width:calc(100% - 32px);}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .progress{height:6px;background:var(--line-soft);border-radius:99px;overflow:hidden;margin:8px 0;display:none;}
@@ -166,11 +176,11 @@
       <div><h1>LINE 貼圖自動化助手</h1><small>主題＋角色圖 → 24 句台詞 → AI 生成 → 自動切割成上架規格</small></div>
     </div>
     <div class="top-actions">
-      <a class="btn" href="manual.html" target="_blank" rel="noopener">使用說明</a>
+      <a class="btn" href="manual.html" target="_blank" rel="noopener">📖 操作手冊</a>
       <button class="btn" id="saveProjectBtn" type="button">儲存專案</button>
       <button class="btn" id="openProjectBtn" type="button">開啟專案</button>
       <input type="file" id="projectFile" accept=".json,application/json" hidden>
-      <button class="btn" id="installBtn" type="button">安裝到桌面</button>
+      <button class="btn" id="installBtn" type="button">📲 加入主畫面</button>
     </div>
   </div>
 </header>
@@ -348,6 +358,25 @@
     </div>
   </section>
 </main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="disclaimer">
+      <strong>使用警語：</strong>AI 生成的貼圖請自行確認沒有侵權、符合 LINE 審核準則後再上架；金鑰與資料只存在你的瀏覽器。
+      <details class="footer-more"><summary>完整警語與隱私說明</summary>
+        <p>本工具協助產生 LINE 貼圖的台詞、生圖提示詞與切割檔案，<strong>不保證作品能通過 LINE Creators Market 審核</strong>。上傳的角色參考圖必須是你自己創作或已取得授權的圖片，不可使用他人的版權角色、商標或真人肖像；AI 生成的圖像可能與既有作品相似，上架前請自行確認沒有侵害著作權、商標權或肖像權。使用 AI 生圖服務產出的圖片能否商用，依各服務商的使用條款而定，請自行查閱。</p>
+        <p>所有設定、台詞、圖片與 API 金鑰都只存在你的瀏覽器本機，不會上傳到本工具的伺服器；按下「AI 生成」或「AI 依主題改寫台詞」時，提示詞與角色參考圖會直接送到你選擇的服務商官方 API（Gemini、OpenRouter、OpenAI、Claude），API 費用由你與服務商自行負擔。規格檢查依 LINE 官方公開準則實作，LINE 若調整規格請以官方最新公告為準。本工具與創作者不對使用本工具產出的內容、上架結果或任何因此產生的損失負責。完整使用說明與創作者資料請見<a href="manual.html" target="_blank" rel="noopener">操作手冊</a>。</p>
+      </details>
+    </div>
+    <div class="footer-row">
+      <span>製作：Mark Tsai（蔡豐全）｜<a href="mailto:tsaimark@gmail.com">tsaimark@gmail.com</a>｜<a href="manual.html#creator" target="_blank" rel="noopener">創作者資料</a>｜<a href="manual.html" target="_blank" rel="noopener">操作手冊</a></span>
+      <span class="footer-links">
+        <img class="visitor-badge" src="https://visitor-badge.laobi.icu/badge?page_id=m255525.linestickerstudio" alt="訪客次數" height="20">
+      </span>
+    </div>
+    <p class="footer-license">本工具僅供教學、課程及個人使用，禁止未經授權公開發布、販售或商業化使用。</p>
+  </div>
+</footer>
 
 <div id="toast"></div>
 
