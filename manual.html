@@ -118,11 +118,16 @@
     <h2>LINE 貼圖規格對照</h2>
     <div class="table-wrap"><table>
       <tr><th>項目</th><th>規格</th><th>本工具處理方式</th></tr>
-      <tr><td>貼圖</td><td>最大 370×320、寬高偶數、PNG、1MB 以下</td><td>自動縮放、裁掉多餘透明邊、留 10px 邊距、強制取偶數，不符合的會標紅</td></tr>
-      <tr><td>主要圖片</td><td>240×240</td><td>自動產生 main.png</td></tr>
-      <tr><td>聊天室標籤</td><td>96×74</td><td>自動產生 tab.png</td></tr>
-      <tr><td>張數</td><td>8／16／24／32／40</td><td>支援 8／16／24</td></tr>
+      <tr><td>貼圖</td><td>最大 370×320、寬高偶數、PNG、1MB 以下</td><td>裁出角色和台詞後，置中放進「內容＋四邊 10px」的偶數尺寸畫布，超過就等比縮小</td></tr>
+      <tr><td>格式／色彩</td><td>PNG、RGB 色彩模式</td><td>一律輸出 RGBA 8bit PNG，並讀回檔頭確認</td></tr>
+      <tr><td>解析度</td><td>72dpi 以上</td><td>每個檔案都寫入 72dpi（PNG pHYs 區塊）</td></tr>
+      <tr><td>背景／邊距</td><td>透明背景、四周約 10px</td><td>逐張檢查四周邊框區域是否全透明</td></tr>
+      <tr><td>主要圖片</td><td>240×240、1MB 以下</td><td>自動產生 main.png（不含台詞）</td></tr>
+      <tr><td>聊天室標籤</td><td>96×74、1MB 以下</td><td>自動產生 tab.png（不含台詞）</td></tr>
+      <tr><td>張數</td><td>8／16／24／32／40</td><td>支援 8／16／24；缺任何一張都不能下載</td></tr>
+      <tr><td>ZIP</td><td>整包 60MB 以下</td><td>下載前檢查總容量</td></tr>
     </table></div>
+    <div class="tip">匯出區有一張<b>規格檢查表</b>，以上每一項都會逐檔驗證，<b>全部打勾才能下載 ZIP</b>，避免送審因格式被退件。</div>
     <div class="warn">上架前請自行確認：角色不是別人的版權角色、參考圖有使用權、台詞不違反 LINE 的審核準則。規格以 LINE Creators Market 官方最新公告為準。</div>
   </section>
 

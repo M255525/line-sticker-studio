@@ -126,6 +126,12 @@
   .export-row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;}
   .export-thumb{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/12px 12px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;padding:6px;}
   .export-thumb img{display:block;}
+  .spec-check{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:6px;}
+  .spec-check li{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:13px;padding:6px 10px;border-radius:8px;background:var(--accent-soft);}
+  .spec-check li.bad{background:var(--warn-soft);}
+  .spec-check li span{font-weight:900;color:var(--accent-dark);}
+  .spec-check li.bad span{color:var(--warn);}
+  .spec-check li small{color:var(--dim);flex-basis:100%;padding-left:20px;}
   .spec-list{margin:0;padding-left:20px;font-size:13px;color:var(--dim);}
   .notice{border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0;}
   .notice.ok{background:var(--accent-soft);color:var(--accent-dark);}
@@ -334,8 +340,9 @@
       <div id="specSummary"></div>
       <h3>LINE Creators Market 規格提醒</h3>
       <ul class="spec-list">
-        <li>貼圖張數 8／16／24／32／40 張；每張 PNG、最大 370×320、寬高需為偶數、單檔 1MB 以下。</li>
-        <li>主要圖片 main 240×240；聊天室標籤 tab 96×74。背景需透明、角色四周建議留約 10px 空白。</li>
+        <li>貼圖張數 8／16／24／32／40 張；每張 PNG、RGB 色彩模式、72dpi 以上、最大 370×320、寬高需為偶數、單檔 1MB 以下。</li>
+        <li>主要圖片 main 240×240；聊天室標籤 tab 96×74（各 1MB 以下）。背景需透明、角色四周留約 10px 空白；整包 ZIP 60MB 以下。</li>
+        <li>本工具輸出時會自動寫入 72dpi，並逐檔讀回 PNG 檔頭與像素驗證；上方檢查表全部打勾才能下載 ZIP。</li>
         <li>上架前請自行確認角色與台詞沒有侵權，也符合 LINE 的審核準則。</li>
       </ul>
     </div>
@@ -1366,15 +1373,22 @@
         ctx.restore();
       });
     }
-    // 裁到內容＋10px 邊，寬高取偶數
+    // 裁出實際內容 → 必要時縮小 → 置中放進「內容＋四邊 10px」的偶數尺寸畫布（最大 370×320）
     var bb = alphaBounds(ctx, MAX_W, MAX_H, 0);
     if(!bb) return cv;
-    var x0 = Math.max(0, bb.x - MARGIN), y0 = Math.max(0, bb.y - MARGIN);
-    var x1 = Math.min(MAX_W, bb.x + bb.w + MARGIN), y1 = Math.min(MAX_H, bb.y + bb.h + MARGIN);
-    var w = x1 - x0, h = y1 - y0;
-    if(w % 2) { if(x1 < MAX_W) x1++; else x0--; w++; }
-    if(h % 2) { if(y1 < MAX_H) y1++; else y0--; h++; }
-    return cropCanvas(cv, {x:x0, y:y0, w:w, h:h});
+    return padToLineSize(cropCanvas(cv, bb), MAX_W, MAX_H, MARGIN);
+  }
+  function ceilEven(v){ var n = Math.ceil(v - 1e-6); return n % 2 ? n + 1 : n; }
+  function padToLineSize(content, maxW, maxH, margin){
+    var s = Math.min(1, (maxW - margin * 2) / content.width, (maxH - margin * 2) / content.height);
+    var cw = content.width * s, chh = content.height * s;
+    var out = document.createElement("canvas");
+    out.width = Math.min(maxW, ceilEven(cw + margin * 2));
+    out.height = Math.min(maxH, ceilEven(chh + margin * 2));
+    var octx = out.getContext("2d", {willReadFrequently:true});
+    octx.imageSmoothingQuality = "high";
+    octx.drawImage(content, (out.width - cw) / 2, (out.height - chh) / 2, cw, chh);
+    return out;
   }
   function fitInto(src, W, H, margin){
     var cv = document.createElement("canvas");
@@ -1389,6 +1403,107 @@
   function canvasToBlob(cv){
     return new Promise(function(resolve){ cv.toBlob(function(b){ resolve(b); }, "image/png"); });
   }
+
+  /* ---- LINE Creators Market 規格：PNG 編碼（寫入 72dpi）與逐檔驗證 ---- */
+  // 依官方貼圖準則（creator.line.me/en/guideline/sticker/，2026-10-12 確認）
+  var LINE_SPEC = {
+    sticker: {label:"貼圖", maxW:370, maxH:320, margin:10},
+    main:    {label:"主要圖片 main", exactW:240, exactH:240, margin:10},
+    tab:     {label:"聊天室標籤 tab", exactW:96, exactH:74, margin:2},
+    counts: [8, 16, 24, 32, 40], maxBytes: 1024 * 1024, maxZipBytes: 60 * 1024 * 1024, minPpm: 2835 // 72dpi ≈ 2835 px/m
+  };
+  var CRC_TABLE = (function(){
+    var t = new Uint32Array(256);
+    for(var n = 0; n < 256; n++){ var c = n; for(var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(bytes){
+    var c = 0xFFFFFFFF;
+    for(var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function readU32(b, o){ return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0; }
+  function writeU32(b, o, v){ b[o] = v >>> 24 & 255; b[o + 1] = v >>> 16 & 255; b[o + 2] = v >>> 8 & 255; b[o + 3] = v & 255; }
+  function pngChunks(bytes){
+    var sig = [137, 80, 78, 71, 13, 10, 26, 10];
+    for(var i = 0; i < 8; i++) if(bytes[i] !== sig[i]) throw new Error("不是 PNG 檔");
+    var out = [], off = 8;
+    while(off + 12 <= bytes.length){
+      var len = readU32(bytes, off);
+      var type = String.fromCharCode(bytes[off + 4], bytes[off + 5], bytes[off + 6], bytes[off + 7]);
+      out.push({type:type, start:off, end:off + 12 + len, data:off + 8, len:len});
+      off += 12 + len;
+      if(type === "IEND") break;
+    }
+    return out;
+  }
+  function physChunk(ppm){
+    var c = new Uint8Array(21);
+    writeU32(c, 0, 9);
+    c.set([112, 72, 89, 115], 4);            // "pHYs"
+    writeU32(c, 8, ppm); writeU32(c, 12, ppm); c[16] = 1; // 單位：公尺
+    writeU32(c, 17, crc32(c.subarray(4, 17)));
+    return c;
+  }
+  // canvas → PNG（RGBA 8bit），並在 IHDR 後寫入 72dpi 的 pHYs
+  async function encodeLinePng(cv){
+    var raw = new Uint8Array(await (await canvasToBlob(cv)).arrayBuffer());
+    var chunks = pngChunks(raw), parts = [raw.subarray(0, 8)];
+    chunks.forEach(function(ch){
+      if(ch.type === "pHYs") return;
+      parts.push(raw.subarray(ch.start, ch.end));
+      if(ch.type === "IHDR") parts.push(physChunk(LINE_SPEC.minPpm));
+    });
+    return new Blob(parts, {type:"image/png"});
+  }
+  // 驗證一張輸出圖：讀 PNG 檔頭＋檢查像素（透明背景、邊距）
+  async function validateLineImage(cv, blob, kind){
+    var spec = LINE_SPEC[kind], issues = [];
+    var bytes = new Uint8Array(await blob.arrayBuffer());
+    var chunks;
+    try{ chunks = pngChunks(bytes); }catch(e){ return ["不是 PNG 檔"]; }
+    var ihdr = chunks[0] && chunks[0].type === "IHDR" ? chunks[0] : null;
+    if(!ihdr) return ["PNG 檔頭異常"];
+    var w = readU32(bytes, ihdr.data), h = readU32(bytes, ihdr.data + 4);
+    var depth = bytes[ihdr.data + 8], colorType = bytes[ihdr.data + 9];
+    if(spec.exactW){
+      if(w !== spec.exactW || h !== spec.exactH) issues.push("尺寸須為 " + spec.exactW + "×" + spec.exactH);
+    } else {
+      if(w > spec.maxW || h > spec.maxH) issues.push("超過 " + spec.maxW + "×" + spec.maxH);
+      if(w % 2 || h % 2) issues.push("寬高須為偶數");
+    }
+    if(!(colorType === 6 || colorType === 2) || depth !== 8) issues.push("色彩模式須為 RGB");
+    var phys = chunks.filter(function(c){ return c.type === "pHYs"; })[0];
+    if(!phys || bytes[phys.data + 8] !== 1 || readU32(bytes, phys.data) < LINE_SPEC.minPpm) issues.push("解析度須 72dpi 以上");
+    if(blob.size > LINE_SPEC.maxBytes) issues.push("超過 1MB");
+    // 透明背景與邊距：四邊 margin 寬的帶狀區域必須全透明（容許 1px 反鋸齒）
+    var band = Math.max(1, spec.margin - 1);
+    var d = cv.getContext("2d", {willReadFrequently:true}).getImageData(0, 0, cv.width, cv.height).data;
+    var edgeHit = false, anyContent = false;
+    for(var y = 0; y < cv.height; y++){
+      for(var x = 0; x < cv.width; x++){
+        var a = d[(y * cv.width + x) * 4 + 3];
+        if(!a) continue;
+        anyContent = true;
+        if(x < band || y < band || x >= cv.width - band || y >= cv.height - band){ edgeHit = true; }
+      }
+    }
+    if(!anyContent) issues.push("圖片是空的");
+    if(edgeHit) issues.push(kind === "sticker" || kind === "main" ? "四周需留約 10px 透明邊距" : "背景須透明");
+    return issues;
+  }
+  async function buildMainTab(){
+    var src = state.results[state.mainIndex] && state.results[state.mainIndex].charCanvas;
+    if(!src) return null;
+    var out = {};
+    for(var kind of ["main", "tab"]){
+      var spec = LINE_SPEC[kind];
+      var cv = fitInto(src, spec.exactW, spec.exactH, spec.margin);
+      var blob = await encodeLinePng(cv);
+      out[kind] = {canvas:cv, blob:blob, issues: await validateLineImage(cv, blob, kind)};
+    }
+    return out;
+  }
   async function ensureFonts(){
     if(!document.fonts || !document.fonts.load) return;
     var sample = state.phrases.map(function(p){ return p.text; }).join("");
@@ -1399,14 +1514,11 @@
     if(!r || !r.charCanvas) return;
     var p = state.phrases[idx] || {text:""};
     var cv = composeSticker(r.charCanvas, p.text);
-    var blob = await canvasToBlob(cv);
+    var blob = await encodeLinePng(cv);
     r.finalCanvas = cv;
     r.blob = blob;
     r.w = cv.width; r.h = cv.height;
-    r.issues = [];
-    if(cv.width > MAX_W || cv.height > MAX_H) r.issues.push("超過 370×320");
-    if(cv.width % 2 || cv.height % 2) r.issues.push("寬高不是偶數");
-    if(blob.size > 1024 * 1024) r.issues.push("超過 1MB");
+    r.issues = await validateLineImage(cv, blob, "sticker");
     r.ok = !r.issues.length;
     if(r.url) URL.revokeObjectURL(r.url);
     r.url = URL.createObjectURL(blob);
@@ -1501,6 +1613,8 @@
     var n = count(), sel = $("mainIndex");
     var any = state.results.some(function(r){ return r && r.charCanvas; });
     $("exportPanel").hidden = !any;
+    state.mainTab = null;
+    $("zipBtn").disabled = true;
     if(!any) return;
     sel.innerHTML = "";
     for(var i = 0; i < n; i++){
@@ -1512,29 +1626,67 @@
     }
     if(!state.results[state.mainIndex] || !state.results[state.mainIndex].charCanvas) state.mainIndex = parseInt(sel.options[0].value, 10);
     sel.value = state.mainIndex;
-    var src = state.results[state.mainIndex].charCanvas;
-    $("mainPreview").src = fitInto(src, 240, 240, 10).toDataURL("image/png");
-    $("tabPreview").src = fitInto(src, 96, 74, 2).toDataURL("image/png");
-    var good = state.results.filter(function(r){ return r && r.ok; }).length;
-    $("specSummary").innerHTML = '<div class="notice ' + (good === n ? "ok" : "warn") + '">ZIP 會包含 ' + good + ' 張可用貼圖' + (good === n ? "" : "（缺的或不合規格的不會放進去，檔名仍照原編號）") + '，以及 main.png、tab.png。</div>';
+    var token = renderExport._t = (renderExport._t || 0) + 1;
+    buildMainTab().then(function(mt){
+      if(token !== renderExport._t || !mt) return;
+      state.mainTab = mt;
+      $("mainPreview").src = mt.main.canvas.toDataURL("image/png");
+      $("tabPreview").src = mt.tab.canvas.toDataURL("image/png");
+      renderSpecReport();
+    });
+  }
+  // 依 LINE 規格逐項檢查，回傳 [{label, ok, detail}]；全部通過才允許下載 ZIP
+  function specReport(){
+    var n = count(), rs = [];
+    for(var i = 0; i < n; i++) rs.push(state.results[i]);
+    var have = rs.filter(function(r){ return r && r.blob; });
+    // 缺圖只在「張數」那列列出；其他列只檢查已產生的圖
+    var missing = rs.map(function(r, i){ return (!r || !r.blob) ? pad2(i + 1) : null; }).filter(Boolean);
+    var failed = function(test){ return rs.map(function(r, i){ return (r && r.blob && test(r)) ? pad2(i + 1) : null; }).filter(Boolean); };
+    var hasIssue = function(word){ return function(r){ return r.issues.some(function(x){ return x.indexOf(word) >= 0; }); }; };
+    var mt = state.mainTab;
+    var list = [];
+    function add(label, bad, extra){ list.push({label:label, ok:!bad.length, detail:bad.length ? "不合格：" + bad.join("、") : (extra || "")}); }
+    add("張數 " + n + " 張（LINE 允許 8／16／24／32／40）", missing.length ? ["缺 " + missing.join("、")] : [], "全部 " + n + " 張都已產生");
+    add("PNG 格式、RGB 色彩模式", failed(hasIssue("RGB")).concat(failed(hasIssue("PNG"))).filter(function(v, i, a){ return a.indexOf(v) === i; }));
+    add("尺寸最大 370×320", failed(hasIssue("超過 370")));
+    add("寬高皆為偶數", failed(hasIssue("偶數")));
+    add("解析度 72dpi 以上", failed(hasIssue("72dpi")));
+    add("單檔 1MB 以下", failed(hasIssue("1MB")));
+    add("透明背景、四周約 10px 邊距", failed(hasIssue("邊距")).concat(failed(hasIssue("空的"))).filter(function(v, i, a){ return a.indexOf(v) === i; }));
+    add("主要圖片 main 240×240", mt ? mt.main.issues : ["尚未產生"]);
+    add("聊天室標籤 tab 96×74", mt ? mt.tab.issues : ["尚未產生"]);
+    var total = have.reduce(function(s, r){ return s + r.blob.size; }, 0) + (mt ? mt.main.blob.size + mt.tab.blob.size : 0);
+    add("ZIP 總容量 60MB 以下", total > LINE_SPEC.maxZipBytes ? ["約 " + (total / 1048576).toFixed(1) + "MB"] : [], "約 " + (total / 1024).toFixed(0) + "KB");
+    return list;
+  }
+  function renderSpecReport(){
+    var list = specReport(), allOk = list.every(function(x){ return x.ok; });
+    var html = '<div class="notice ' + (allOk ? "ok" : "err") + '">' + (allOk
+      ? "全部通過 LINE Creators Market 規格檢查，可以下載 ZIP 直接上傳。"
+      : "還有項目不符合 LINE 規格，修正前無法下載 ZIP（避免送審被退）。") + '</div><ul class="spec-check">';
+    list.forEach(function(x){
+      html += '<li class="' + (x.ok ? "ok" : "bad") + '"><span>' + (x.ok ? "✓" : "✗") + '</span><b>' + escapeHtml(x.label) + '</b>' + (x.detail ? '<small>' + escapeHtml(x.detail) + '</small>' : '') + '</li>';
+    });
+    $("specSummary").innerHTML = html + '</ul>';
+    $("zipBtn").disabled = !allOk;
   }
   async function downloadZip(){
     if(typeof JSZip === "undefined"){ toast("ZIP 元件載入失敗，請確認網路後重新整理"); return; }
-    var zip = new JSZip(), n = count(), added = 0;
-    for(var i = 0; i < n; i++){
-      var r = state.results[i];
-      if(r && r.ok && r.blob){ zip.file(pad2(i + 1) + ".png", r.blob); added++; }
-    }
-    if(!added){ toast("沒有可匯出的貼圖"); return; }
-    var src = state.results[state.mainIndex].charCanvas;
-    zip.file("main.png", await canvasToBlob(fitInto(src, 240, 240, 10)));
-    zip.file("tab.png", await canvasToBlob(fitInto(src, 96, 74, 2)));
+    if(!state.mainTab) state.mainTab = await buildMainTab();
+    var list = specReport();
+    if(!list.every(function(x){ return x.ok; })){ renderSpecReport(); toast("還有項目不符合 LINE 規格，請先修正"); return; }
+    var zip = new JSZip(), n = count();
+    for(var i = 0; i < n; i++) zip.file(pad2(i + 1) + ".png", state.results[i].blob);
+    zip.file("main.png", state.mainTab.main.blob);
+    zip.file("tab.png", state.mainTab.tab.blob);
     var blob = await zip.generateAsync({type:"blob"});
+    if(blob.size > LINE_SPEC.maxZipBytes){ toast("ZIP 超過 60MB，無法上傳 LINE"); return; }
     var name = ($("theme").value.trim().split(/[，,。\s]/)[0] || "line-stickers").slice(0, 20);
     var url = URL.createObjectURL(blob);
     downloadDataUrl(url, name + "-貼圖.zip");
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-    toast("已下載 " + added + " 張貼圖＋main＋tab");
+    toast("已下載 " + n + " 張貼圖＋main＋tab（全部符合 LINE 規格）");
   }
 
   /* ================= 專案存檔 ================= */

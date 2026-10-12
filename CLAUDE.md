@@ -13,7 +13,8 @@
 - 預設值集中放在 `INTENTS`（24 個英文動作描述，順序＝常用優先序）、`LANG_MODES`（8 種語言，各 24 句台詞，跟 INTENTS 一一對應）、`STYLES`、`EXAGGERATION`、`KEYS`、`FONTS`、`GRID`（每批格數→欄列／Gemini aspectRatio／OpenAI size）。
 - 圖像模型**預設不畫字**，台詞由 `composeSticker` 用 Canvas 疊上，避免 AI 寫錯中文字；`textMode=ai` 時才讓 AI 畫字（這時雜點清除會保留小元件）。
 - 切割管線（`runCut`）：`cellRects` 平均切格 → `detectBg`（取整張圖外框像素的中位數當背景色，不寫死 #00FF00）→ `keyOut`（global 或 flood；半透明邊緣做 unpremultiply，綠幕另外做 despill）→ `despeckle`（連通元件，刪掉小噪點和碰到邊緣的鄰格殘影）→ `alphaBounds` 裁切 → `composeSticker`（疊字、裁到內容＋10px、強制偶數）。
-- main/tab 由主要圖片的 `charCanvas`（不含文字）`fitInto` 產生。
+- main/tab 由主要圖片的 `charCanvas`（不含文字）`fitInto` 產生（`buildMainTab`）。
+- **LINE 規格強制**（`LINE_SPEC`，依 creator.line.me/en/guideline/sticker/，2026-10-12 確認）：`composeSticker` 最後用 `padToLineSize` 把內容置中放進「內容＋10px」的偶數尺寸畫布（最大 370×320）；`encodeLinePng` 在 IHDR 後寫入 72dpi 的 pHYs（canvas.toBlob 本身不帶 dpi）；`validateLineImage` 讀回 PNG 檔頭檢查尺寸、偶數、RGB 8bit、dpi、≤1MB，並檢查四邊 margin−1 px 帶狀區域全透明；`specReport`／`renderSpecReport` 列出 10 項檢查，**任一項不合格就停用 ZIP 下載**（含缺圖、ZIP 超過 60MB）。已用 PIL 獨立驗證過 ZIP 內 26 個檔案。
 - 測試掛鉤：`window._sticker`（state、runCut、generateDemo、showStep、buildImagePrompt）。「產生示範網格」用程式畫的角色，不需要金鑰就能驗證切割流程。
 
 ## 驗證紀錄（2026-10-12）
