@@ -64,6 +64,18 @@
   textarea{resize:vertical;}
   .key-link{font-size:12px;color:var(--accent-dark);text-decoration:none;align-self:flex-end;}
   .key-link:hover{text-decoration:underline;}
+  .breakdown .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+  .breakdown .check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);margin:4px 0;}
+  .paste-box{margin-top:6px;font-size:13px;}
+  .paste-box summary{cursor:pointer;color:var(--accent-dark);font-weight:700;}
+  .paste-box textarea{margin:6px 0;font-size:12.5px;}
+  .bd-card{margin-top:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:10px 12px;}
+  .bd-card header{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
+  .bd-card header b{font-size:14px;}
+  .bd-row{display:grid;grid-template-columns:130px 1fr;gap:8px;align-items:start;margin-bottom:6px;}
+  .bd-row label{font-size:12.5px;color:var(--dim);font-weight:700;padding-top:7px;}
+  .bd-row textarea{font-size:13px;min-height:36px;}
+  @media (max-width:560px){ .bd-row{grid-template-columns:1fr;gap:2px;} .bd-row label{padding-top:0;} }
   .prompt-gen{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line);}
   .prompt-gen h3{margin-top:0;}
   .prompt-gen-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;}
@@ -225,6 +237,28 @@
             <textarea id="theme" rows="3" placeholder="例如：上班族柴犬，每天努力打卡、最愛珍珠奶茶"></textarea>
           </div>
           <div class="chips" id="themeChips"></div>
+          <div class="breakdown">
+            <div class="field" style="margin:12px 0 6px;"><label for="themeMode">主題拆解方式</label>
+              <select id="themeMode">
+                <option value="plain">不使用 AI（直接用主題文字產生提示詞）</option>
+                <option value="ai">AI 拆解主題（角色設定、道具、口頭禪更完整）</option>
+              </select>
+            </div>
+            <div id="breakdownBox" hidden>
+              <p class="hint">AI 會把主題拆成角色外觀、個性、招牌道具、口頭禪、目標族群與語氣，並依語言模式寫好台詞；有上傳參考圖時會一起分析角色外觀。完成後會自動把提示詞放進下方「產生提示詞」。</p>
+              <div class="btn-row">
+                <button class="btn primary" id="breakdownBtn" type="button">🤖 AI 拆解主題</button>
+                <button class="btn" id="copyBreakdownPromptBtn" type="button">複製拆解提示詞（貼到聊天 AI）</button>
+              </div>
+              <label class="check"><input type="checkbox" id="breakdownApplyPhrases" checked> 同時套用 AI 寫的台詞</label>
+              <details class="paste-box"><summary>已經在聊天 AI 拆解了？把回覆貼回這裡</summary>
+                <textarea id="breakdownReply" rows="4" placeholder="把 AI 回覆的整段內容貼上，會自動抓出 JSON"></textarea>
+                <button class="btn small primary" id="importBreakdownBtn" type="button">匯入拆解結果</button>
+              </details>
+              <div id="breakdownStatus" class="hint" style="margin:6px 0 0;"></div>
+              <div id="breakdownResult"></div>
+            </div>
+          </div>
           <h3>常用預設值</h3>
           <div class="grid-3">
             <div class="field"><label for="langMode">語言模式</label><select id="langMode"></select></div>
@@ -517,7 +551,7 @@
 
   /* ================= 設定保存 ================= */
   var SETTING_IDS = ["theme","langMode","artStyle","stickerCount","exaggeration","textMode","keyColor","batchSize",
-    "promptCompact","cutTol","cutKeyMode","cutTrim","cutGutter","cutDespeckle","txtFont","txtPos","txtFill","txtStroke","txtStrokeW","txtSize"];
+    "promptCompact","themeMode","cutTol","cutKeyMode","cutTrim","cutGutter","cutDespeckle","txtFont","txtPos","txtFill","txtStroke","txtStrokeW","txtSize"];
   function collectSettings(){
     var s = {};
     SETTING_IDS.forEach(function(id){ s[id] = $(id).value; });
@@ -647,12 +681,15 @@
   }
 
   /* ================= 文字模型（沿用 food-calorie-tracker 的四供應商格式） ================= */
-  async function callLLM(provider, model, apiKey, prompt, onRetry){
+  async function callLLM(provider, model, apiKey, prompt, onRetry, imageDataUrl){
     var url, headers, body, extract;
+    var img = imageDataUrl ? splitDataUrl(imageDataUrl) : null;
     if(provider === "claude"){
       url = "https://api.anthropic.com/v1/messages";
       headers = {"content-type":"application/json", "x-api-key":apiKey, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true"};
-      body = {model: model, max_tokens: 4000, messages: [{role:"user", content: prompt}]};
+      body = {model: model, max_tokens: 6000, messages: [{role:"user", content: img
+        ? [{type:"image", source:{type:"base64", media_type:img.mime, data:img.data}}, {type:"text", text:prompt}]
+        : prompt}]};
       extract = function(d){
         if(d.stop_reason === "refusal") throw new Error("模型拒絕了這個請求（refusal）");
         return (d.content || []).filter(function(b){ return b.type === "text"; }).map(function(b){ return b.text; }).join("");
@@ -660,12 +697,14 @@
     } else if(provider === "openai" || provider === "openrouter"){
       url = provider === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions";
       headers = {"content-type":"application/json", "authorization":"Bearer " + apiKey};
-      body = {model: model, messages: [{role:"user", content: prompt}]};
+      body = {model: model, messages: [{role:"user", content: img
+        ? [{type:"text", text:prompt}, {type:"image_url", image_url:{url:imageDataUrl}}]
+        : prompt}]};
       extract = function(d){ return d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content; };
     } else if(provider === "gemini"){
       url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
       headers = {"content-type":"application/json", "x-goog-api-key":apiKey};
-      body = {contents: [{parts: [{text: prompt}]}]};
+      body = {contents: [{parts: img ? [{text: prompt}, {inline_data:{mime_type:img.mime, data:img.data}}] : [{text: prompt}]}]};
       extract = function(d){
         var ps = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
         return ps.map(function(p){ return p.text || ""; }).join("");
@@ -822,20 +861,141 @@
     return JSON.parse(t.slice(a, b + 1));
   }
   function isCompact(){ return $("promptCompact").value === "1"; }
+
+  /* ================= 主題拆解（選用 AI） ================= */
+  var BREAKDOWN_FIELDS = [
+    {k:"character_zh", label:"角色外觀與設定"},
+    {k:"character_en", label:"Character（英文，給生圖用）"},
+    {k:"personality",  label:"個性"},
+    {k:"props",        label:"招牌道具／元素"},
+    {k:"props_en",     label:"Props（英文）"},
+    {k:"catchphrases", label:"口頭禪"},
+    {k:"audience",     label:"目標族群"},
+    {k:"tone",         label:"台詞語氣"}
+  ];
+  var BREAKDOWN_KEY = "lineStickerStudioBreakdown";
+  function useBreakdown(){ return $("themeMode").value === "ai" && !!state.breakdown; }
+  function persistBreakdown(){
+    try{ localStorage.setItem(BREAKDOWN_KEY, JSON.stringify(state.breakdown || null)); }catch(e){}
+  }
+  function buildBreakdownPrompt(viaChat){
+    var theme = $("theme").value.trim() || "可愛的原創角色";
+    var n = count(), mode = LANG_MODES[$("langMode").value], style = STYLES[$("artStyle").value];
+    var lines = [
+      "你是專業的 LINE 貼圖企劃與角色設計師。請拆解下面的貼圖主題，並設計 " + n + " 張貼圖的台詞。",
+      "貼圖主題：" + theme,
+      "台詞語言風格：" + mode.label + "（" + mode.desc + "）",
+      "畫風：" + style.label
+    ];
+    if(state.refImage) lines.push(viaChat ? "我會同時附上角色參考圖，角色外觀請以參考圖為準。" : "附件是角色參考圖，角色外觀請以參考圖為準。");
+    lines.push(
+      "台詞規則：聊天時最常用、能直接回覆對話的短句（中文 2-7 字／英文 1-4 字／日文 2-8 字），涵蓋打招呼、道謝、道歉、答應、拒絕與各種情緒，融入角色的個性、口頭禪與道具，不重複、不用 emoji；越常用的放越前面。",
+      "只輸出一個 JSON 物件，不要 markdown，不要其他文字，格式：",
+      '{"character_zh":"角色外觀與設定（中文 40 字內）",' +
+      '"character_en":"English visual description for an image model: species, body shape, color palette, outfit, distinctive features (30-50 words)",' +
+      '"personality":"個性（中文）","props":"招牌道具或元素（中文，用、分隔）","props_en":"the same props in English, comma separated",' +
+      '"catchphrases":"口頭禪（用、分隔）","audience":"目標族群","tone":"台詞語氣",' +
+      '"phrases":[{"text":"台詞","pose":"English expression and action, 10-20 words, may use the props"}]}',
+      "phrases 必須剛好 " + n + " 句。"
+    );
+    return lines.join("\n");
+  }
+  function parseJsonObject(raw){
+    var t = raw.replace(/```(?:json)?/gi, "");
+    var a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if(a < 0 || b <= a) throw new Error("AI 回傳的格式無法解析");
+    return JSON.parse(t.slice(a, b + 1));
+  }
+  function applyBreakdown(raw){
+    var obj = parseJsonObject(raw), bd = {_theme: $("theme").value.trim()};
+    BREAKDOWN_FIELDS.forEach(function(f){
+      var v = obj[f.k];
+      bd[f.k] = Array.isArray(v) ? v.join("、") : String(v == null ? "" : v).trim();
+    });
+    if(!bd.character_en && !bd.character_zh) throw new Error("AI 回覆裡沒有角色設定");
+    state.breakdown = bd;
+    persistBreakdown();
+    var got = 0;
+    if($("breakdownApplyPhrases").checked && Array.isArray(obj.phrases) && obj.phrases.length){
+      got = applyPhraseReply(JSON.stringify(obj.phrases));
+    }
+    renderBreakdown();
+    showImagePrompts();
+    $("breakdownStatus").textContent = "拆解完成" + (got ? "，已套用 " + got + " 句台詞" : "") + "，下方「產生提示詞」已更新為拆解版。";
+    return got;
+  }
+  function renderBreakdown(){
+    var box = $("breakdownResult");
+    box.innerHTML = "";
+    if(!state.breakdown) return;
+    var card = document.createElement("div");
+    card.className = "bd-card";
+    card.innerHTML = '<header><b>AI 拆解結果（可以直接修改）</b><button class="btn small danger" type="button">清除拆解</button></header>';
+    BREAKDOWN_FIELDS.forEach(function(f){
+      var row = document.createElement("div");
+      row.className = "bd-row";
+      row.innerHTML = '<label></label><textarea rows="2"></textarea>';
+      row.querySelector("label").textContent = f.label;
+      var ta = row.querySelector("textarea");
+      ta.value = state.breakdown[f.k] || "";
+      ta.addEventListener("change", function(){
+        state.breakdown[f.k] = ta.value.trim();
+        persistBreakdown();
+        refreshShownPrompts();
+      });
+      card.appendChild(row);
+    });
+    card.querySelector("header button").addEventListener("click", function(){
+      state.breakdown = null; persistBreakdown(); renderBreakdown();
+      $("breakdownStatus").textContent = "已清除拆解結果，提示詞改回直接使用主題文字。";
+      refreshShownPrompts();
+    });
+    box.appendChild(card);
+  }
+  function syncThemeMode(){
+    $("breakdownBox").hidden = $("themeMode").value !== "ai";
+  }
+  async function aiBreakdown(){
+    var creds = getTxtCreds();
+    if(!creds.apiKey){ $("aiPanel").open = true; toast("請先在上方「AI 連線設定」填入文字模型金鑰，或按「複製拆解提示詞」貼到聊天 AI"); return; }
+    if(!$("theme").value.trim()){ toast("請先輸入貼圖主題"); $("theme").focus(); return; }
+    var btn = $("breakdownBtn");
+    btn.disabled = true;
+    $("breakdownStatus").textContent = "呼叫 " + TXT_PROVIDERS[creds.provider].label + " 拆解中" + (state.refImage ? "（含參考圖分析）" : "") + "，約 10～40 秒…";
+    try{
+      var raw = await callLLM(creds.provider, creds.model, creds.apiKey, buildBreakdownPrompt(false), function(a, s, w){
+        $("breakdownStatus").textContent = "服務忙碌（" + s + "），" + w + " 秒後第 " + (a + 1) + " 次嘗試…";
+      }, state.refImage);
+      applyBreakdown(raw);
+      toast("主題拆解完成");
+    }catch(e){
+      $("breakdownStatus").textContent = "";
+      toast("AI 拆解失敗：" + e.message);
+    }finally{
+      btn.disabled = false;
+    }
+  }
+  function breakdownZhLine(){
+    var bd = state.breakdown;
+    return "角色設定：" + [bd.character_zh, bd.personality && "個性 " + bd.personality, bd.props && "道具 " + bd.props,
+      bd.catchphrases && "口頭禪 " + bd.catchphrases, bd.audience && "目標族群 " + bd.audience, bd.tone && "語氣 " + bd.tone].filter(Boolean).join("；");
+  }
   function buildPhrasePrompt(){
     var theme = $("theme").value.trim() || "可愛的原創角色";
     var n = count(), mode = LANG_MODES[$("langMode").value];
     if(isCompact()){
       return [
         "LINE 貼圖台詞企劃。主題：" + theme + "。語言風格：" + mode.label + "（" + mode.desc + "）。",
+        useBreakdown() ? breakdownZhLine() : null,
         "產生 " + n + " 句聊天常用短句（中文 2-7 字／英文 1-4 字／日文 2-8 字），涵蓋招呼、道謝、道歉、答應、拒絕與各種情緒，融入主題特色，不重複、不用 emoji。",
         "每句附英文 pose（10-20 字，表情＋動作）。",
         '只輸出 JSON：[{"text":"","pose":""}]'
-      ].join("\n");
+      ].filter(Boolean).join("\n");
     }
     return [
       "你是專業的 LINE 貼圖企劃。",
       "貼圖主題／角色：" + theme,
+      useBreakdown() ? breakdownZhLine() : null,
       "台詞語言風格：" + mode.label + "（" + mode.desc + "）",
       "請產生 " + n + " 句貼圖台詞。規則：",
       "1. 每句是聊天時最常用、可以直接拿來回覆對話的短句；中文 2～7 個字，英文 1～4 個單字，日文 2～8 個字。",
@@ -846,7 +1006,7 @@
       defaultPhrases().map(function(p, i){ return (i + 1) + ". " + p.text; }).join("、"),
       "只輸出 JSON 陣列本身，不要 markdown，不要其他文字，格式：",
       '[{"text":"台詞","pose":"english pose description"}]'
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }
   // 把 AI 回傳的台詞 JSON 套進表格，回傳實際套用句數
   function applyPhraseReply(raw){
@@ -907,6 +1067,12 @@
     }
     state.results = [];
   }
+  function breakdownEnLine(){
+    var bd = state.breakdown;
+    return ["Character design: " + (bd.character_en || bd.character_zh) + ".",
+      bd.personality ? "Personality: " + bd.personality + "." : "",
+      (bd.props_en || bd.props) ? "Signature props (use them in some poses): " + (bd.props_en || bd.props) + "." : ""].filter(Boolean).join(" ");
+  }
   function buildImagePrompt(b){
     var key = KEYS[$("keyColor").value], style = STYLES[$("artStyle").value], ex = EXAGGERATION[$("exaggeration").value];
     var textMode = $("textMode").value, theme = $("theme").value.trim() || "a cute original mascot";
@@ -914,6 +1080,7 @@
     if(isCompact()){
       lines.push("ONE image: LINE sticker sheet, grid " + b.cols + "x" + b.rows + " = " + b.n + " stickers, the same character in every cell" + (state.refImage ? " (match the attached reference exactly)." : "."));
       lines.push("Theme: " + theme);
+      if(useBreakdown()) lines.push(breakdownEnLine());
       lines.push("Style: " + style.prompt + ". Expressions: " + ex.prompt + ".");
       lines.push("Each character centered in its cell with margin, not cropped; no grid lines or borders.");
       lines.push("Background: flat " + key.prompt + ", no shadows. " + key.avoid);
@@ -930,6 +1097,7 @@
       ? "Character: exactly the character in the attached reference image. Keep the identical face, colors, outfit, proportions and details in every cell."
       : "Character: design one original mascot that fits the theme, and keep it identical in every cell.");
     lines.push("Theme: " + theme);
+    if(useBreakdown()) lines.push(breakdownEnLine());
     lines.push("Art style: " + style.prompt + ".");
     lines.push("Expressions: " + ex.prompt + ".");
     lines.push("Layout: equal-sized invisible cells. Each character is centered in its own cell, fully visible (not cropped), with generous empty space around it. Nothing may cross into neighbouring cells. No grid lines, no borders, no frames, no panel dividers.");
@@ -1163,6 +1331,11 @@
     ensurePhraseCount();
     planBatches();
     var parts = ["LINE 貼圖提示詞", "主題：" + ($("theme").value.trim() || "（未填）"), "語言模式：" + LANG_MODES[$("langMode").value].label + "　畫風：" + STYLES[$("artStyle").value].label + "　張數：" + count(), ""];
+    if(useBreakdown()){
+      parts.push("==================== AI 主題拆解結果 ====================");
+      BREAKDOWN_FIELDS.forEach(function(f){ parts.push(f.label + "：" + (state.breakdown[f.k] || "")); });
+      parts.push("");
+    }
     parts.push("==================== ① 台詞企劃提示詞 ====================", buildPhrasePrompt(), "");
     parts.push("（目前台詞）", state.phrases.map(function(p, i){ return pad2(i + 1) + ". " + p.text + "｜" + p.pose; }).join("\n"), "");
     state.batches.forEach(function(b, i){
@@ -1724,7 +1897,7 @@
       app: "line-sticker-studio", version: 1, savedAt: new Date().toISOString(),
       settings: collectSettings(), phrases: state.phrases, refImage: state.refImage,
       batches: state.batches.map(function(b){ return {start:b.start, n:b.n, cols:b.cols, rows:b.rows, image:b.image}; }),
-      mainIndex: state.mainIndex
+      mainIndex: state.mainIndex, breakdown: state.breakdown || null
     };
     var blob = new Blob([JSON.stringify(data)], {type:"application/json"});
     var url = URL.createObjectURL(blob);
@@ -1742,6 +1915,8 @@
       state.batches = (data.batches || []).map(function(b){ return {start:b.start, n:b.n, cols:b.cols, rows:b.rows, image:b.image || null, status:b.image ? "done" : "empty", msg:""}; });
       state.results = [];
       state.mainIndex = data.mainIndex || 0;
+      state.breakdown = data.breakdown || null;
+      persistBreakdown(); renderBreakdown(); syncThemeMode();
       persistSettings();
       renderPhrases();
       toast("已開啟專案");
@@ -1807,6 +1982,24 @@
 
     $("batchSize").addEventListener("change", function(){ renderBatches(); });
     $("genPhrasePromptBtn").addEventListener("click", showPhrasePrompt);
+    try{ state.breakdown = JSON.parse(localStorage.getItem(BREAKDOWN_KEY)) || null; }catch(e){ state.breakdown = null; }
+    renderBreakdown(); syncThemeMode();
+    $("themeMode").addEventListener("change", syncThemeMode);
+    $("breakdownBtn").addEventListener("click", aiBreakdown);
+    $("copyBreakdownPromptBtn").addEventListener("click", function(){
+      if(!$("theme").value.trim()){ toast("請先輸入貼圖主題"); return; }
+      copyText(buildBreakdownPrompt(true));
+      $("breakdownStatus").textContent = "已複製拆解提示詞。貼到 ChatGPT／Gemini／Claude" + (state.refImage ? "（記得附上角色參考圖）" : "") + "，再把回覆貼到下方「把回覆貼回這裡」。";
+      document.querySelector(".paste-box").open = true;
+    });
+    $("importBreakdownBtn").addEventListener("click", function(){
+      try{ applyBreakdown($("breakdownReply").value); document.querySelector(".paste-box").open = false; toast("已匯入拆解結果"); }
+      catch(e){ toast("匯入失敗：" + e.message); }
+    });
+    $("theme").addEventListener("input", function(){
+      if(state.breakdown && $("themeMode").value === "ai" && state.breakdown._theme !== $("theme").value.trim())
+        $("breakdownStatus").textContent = "主題已修改，建議重新拆解，讓角色設定跟上新主題。";
+    });
     $("genImagePromptBtn").addEventListener("click", showImagePrompts);
     $("downloadPromptsBtn").addEventListener("click", downloadAllPrompts);
     $("genAllBtn").addEventListener("click", generateAll);
