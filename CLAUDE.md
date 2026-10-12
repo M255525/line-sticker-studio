@@ -4,7 +4,8 @@
 
 - 本機預覽：port **8829**（`.claude/launch.json` 的 `line-sticker-studio`）。
 - **尚未部署**：只有本機 git，沒有遠端、沒有 GitHub Pages、沒有序號授權。依使用者偏好，新工具上線前要先問過。
-- BYOK：圖像（Gemini `gemini-3.1-flash-image` / OpenAI `gpt-image-1`）與文字（Gemini/Claude/OpenAI/OpenRouter，沿用 food-calorie-tracker 的 callLLM 格式）分開設定；localStorage key `lineStickerStudioApiConfig`，設定值存在 `lineStickerStudioSettings`。
+- BYOK：圖像（Gemini `gemini-3.1-flash-image`／OpenRouter `google/gemini-3.1-flash-image`／OpenAI `gpt-image-1`）與文字（Gemini/OpenRouter/Claude/OpenAI，沿用 food-calorie-tracker 的 callLLM 格式）分開選服務商；**金鑰依服務商存在 `keys` 表**（`lineStickerStudioApiConfig.keys`），兩邊選同一家就共用；舊版 `imgKey/txtKey` 會在載入時自動搬進去。設定值存在 `lineStickerStudioSettings`。
+- OpenRouter 圖像：`chat/completions` 加 `modalities:["image","text"]` 與 `image_config.aspect_ratio`，圖片從 `choices[0].message.images[].image_url.url`（data URL）取出。模型 ID 用 `curl https://openrouter.ai/api/v1/models` 篩選 `output_modalities` 含 image 的模型來確認（2026-10-12 已確認）。假金鑰測試回 401，代表 CORS 和請求路徑都正常。
 - 頂部跑馬燈共用工作區公告 GAS（滑鼠移入會暫停）。
 
 ## 架構重點

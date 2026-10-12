@@ -62,6 +62,8 @@
   input[type=text],input[type=password],input[type=number],select,textarea{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:#fff;color:var(--ink);width:100%;min-width:0;}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent);}
   textarea{resize:vertical;}
+  .key-link{font-size:12px;color:var(--accent-dark);text-decoration:none;align-self:flex-end;}
+  .key-link:hover{text-decoration:underline;}
   .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
   .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;}
   .stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
@@ -166,16 +168,16 @@
       <div class="ai-box">
         <h4>圖像生成（步驟 3 自動生圖用）</h4>
         <div class="field"><label for="imgProvider">服務商</label><select id="imgProvider"></select></div>
-        <div class="field"><label for="imgModel">模型 ID</label><input type="text" id="imgModel" autocomplete="off"></div>
-        <div class="field"><label for="imgKey">API 金鑰</label><input type="password" id="imgKey" autocomplete="off" placeholder="貼上你的金鑰"></div>
-        <p class="hint">沒有圖像 API 也沒關係：步驟 3 可以複製提示詞，到 Gemini 或 ChatGPT 網頁版生圖，再把圖上傳回來。</p>
+        <div class="field"><label for="imgModel">模型 ID（可點選建議或自行輸入）</label><input type="text" id="imgModel" list="imgModelList" autocomplete="off"><datalist id="imgModelList"></datalist></div>
+        <div class="field"><label for="imgKey" id="imgKeyLabel">API 金鑰</label><input type="password" id="imgKey" autocomplete="off"><a class="key-link" id="imgKeyLink" target="_blank" rel="noopener noreferrer"></a></div>
+        <p class="hint">每家服務商的金鑰會分開保存，切換服務商不會洗掉。沒有圖像 API 也沒關係：步驟 3 可以複製提示詞，到 Gemini 或 ChatGPT 網頁版生圖，再把圖上傳回來。</p>
       </div>
       <div class="ai-box">
         <h4>文字模型（步驟 2「AI 依主題改寫台詞」用，選用）</h4>
         <div class="field"><label for="txtProvider">服務商</label><select id="txtProvider"></select></div>
-        <div class="field"><label for="txtModel">模型 ID</label><input type="text" id="txtModel" autocomplete="off"></div>
-        <div class="field"><label for="txtKey">API 金鑰</label><input type="password" id="txtKey" autocomplete="off" placeholder="留空＝服務商相同時沿用圖像金鑰"></div>
-        <p class="hint">不設定也能用：每種語言模式都內建 24 句常用台詞。</p>
+        <div class="field"><label for="txtModel">模型 ID</label><input type="text" id="txtModel" list="txtModelList" autocomplete="off"><datalist id="txtModelList"></datalist></div>
+        <div class="field"><label for="txtKey" id="txtKeyLabel">API 金鑰</label><input type="password" id="txtKey" autocomplete="off"><a class="key-link" id="txtKeyLink" target="_blank" rel="noopener noreferrer"></a></div>
+        <p class="hint">跟圖像選同一家服務商時會自動共用同一把金鑰。不設定也能用：每種語言模式都內建 24 句常用台詞。</p>
       </div>
     </div>
   </details>
@@ -407,14 +409,25 @@
   var THEME_EXAMPLES = ["上班族柴犬，每天努力打卡、最愛珍珠奶茶","愛吃的胖橘貓，整天想著吃跟睡","元氣小雞，超有活力的加油團長","慵懶水豚，什麼事都慢慢來","熱血兔兔，運動健身狂"];
 
   var IMG_PROVIDERS = {
-    gemini: {label:"Gemini（Google AI Studio）", defaultModel:"gemini-3.1-flash-image"},
-    openai: {label:"OpenAI", defaultModel:"gpt-image-1"}
+    gemini:     {label:"Gemini（Google AI Studio）", defaultModel:"gemini-3.1-flash-image",
+                 models:["gemini-3.1-flash-image","gemini-3-pro-image"]},
+    openrouter: {label:"OpenRouter（一把金鑰用多家模型）", defaultModel:"google/gemini-3.1-flash-image",
+                 models:["google/gemini-3.1-flash-image","google/gemini-3-pro-image","google/gemini-2.5-flash-image","openai/gpt-5-image-mini","openai/gpt-5-image"]},
+    openai:     {label:"OpenAI", defaultModel:"gpt-image-1", models:["gpt-image-1"]}
   };
   var TXT_PROVIDERS = {
     gemini:     {label:"Gemini（Google AI Studio）", defaultModel:"gemini-3.5-flash"},
+    openrouter: {label:"OpenRouter",                defaultModel:"google/gemini-3.5-flash",
+                 models:["google/gemini-3.5-flash","google/gemini-3.8-flash","google/gemini-3.5-flash-lite"]},
     claude:     {label:"Claude（Anthropic）",       defaultModel:"claude-sonnet-5-5"},
-    openai:     {label:"OpenAI",                    defaultModel:"gpt-4o-mini"},
-    openrouter: {label:"OpenRouter",                defaultModel:"openai/gpt-4o-mini"}
+    openai:     {label:"OpenAI",                    defaultModel:"gpt-4o-mini"}
+  };
+  // 各服務商金鑰的提示與申請網址（金鑰依服務商分開保存）
+  var KEY_INFO = {
+    gemini:     {name:"Gemini",     placeholder:"AIza…",      url:"https://aistudio.google.com/apikey"},
+    openrouter: {name:"OpenRouter", placeholder:"sk-or-v1-…", url:"https://openrouter.ai/keys"},
+    openai:     {name:"OpenAI",     placeholder:"sk-…",       url:"https://platform.openai.com/api-keys"},
+    claude:     {name:"Claude",     placeholder:"sk-ant-…",   url:"https://console.anthropic.com/settings/keys"}
   };
   var API_STORAGE_KEY = "lineStickerStudioApiConfig";
   var SETTINGS_KEY = "lineStickerStudioSettings";
@@ -480,46 +493,72 @@
   function loadApiConfig(){
     try{ return JSON.parse(localStorage.getItem(API_STORAGE_KEY)) || {}; }catch(e){ return {}; }
   }
+  var apiKeys = {};   // {gemini, openrouter, openai, claude}：圖像與文字選同一家時共用同一把
   function persistApiConfig(){
     try{
       localStorage.setItem(API_STORAGE_KEY, JSON.stringify({
-        imgProvider: $("imgProvider").value, imgModel: $("imgModel").value.trim(), imgKey: $("imgKey").value.trim(),
-        txtProvider: $("txtProvider").value, txtModel: $("txtModel").value.trim(), txtKey: $("txtKey").value.trim()
+        imgProvider: $("imgProvider").value, imgModel: $("imgModel").value.trim(),
+        txtProvider: $("txtProvider").value, txtModel: $("txtModel").value.trim(),
+        keys: apiKeys
       }));
     }catch(e){}
     updateAiBadge();
   }
-  function bindProvider(selId, modelId, providers, savedProvider, savedModel){
-    var sel = $(selId), modelEl = $(modelId);
+  // 金鑰欄位顯示目前服務商的金鑰，標籤與申請連結跟著換
+  function refreshKeyField(side){
+    var provider = $(side + "Provider").value, info = KEY_INFO[provider];
+    var input = $(side + "Key");
+    input.value = apiKeys[provider] || "";
+    input.placeholder = info.placeholder;
+    $(side + "KeyLabel").textContent = info.name + " API 金鑰";
+    var link = $(side + "KeyLink");
+    link.href = info.url;
+    link.textContent = "申請 " + info.name + " 金鑰 ↗";
+  }
+  function refreshModelList(side, providers){
+    var list = $(side + "ModelList");
+    list.innerHTML = "";
+    (providers[$(side + "Provider").value].models || []).forEach(function(m){
+      var o = document.createElement("option"); o.value = m; list.appendChild(o);
+    });
+  }
+  function bindProvider(side, providers, savedProvider, savedModel){
+    var sel = $(side + "Provider"), modelEl = $(side + "Model");
     fillSelect(sel, providers, "label");
     sel.value = savedProvider && providers[savedProvider] ? savedProvider : Object.keys(providers)[0];
     modelEl.value = savedModel || providers[sel.value].defaultModel;
+    refreshModelList(side, providers);
+    refreshKeyField(side);
     sel.addEventListener("change", function(){
       var isDefault = Object.keys(providers).some(function(k){ return providers[k].defaultModel === modelEl.value.trim(); });
       if(!modelEl.value.trim() || isDefault) modelEl.value = providers[sel.value].defaultModel;
+      refreshModelList(side, providers);
+      refreshKeyField(side);
       persistApiConfig();
     });
     modelEl.addEventListener("input", persistApiConfig);
+    $(side + "Key").addEventListener("input", function(){
+      apiKeys[sel.value] = $(side + "Key").value.trim();
+      var other = side === "img" ? "txt" : "img";
+      if($(other + "Provider").value === sel.value) refreshKeyField(other);
+      persistApiConfig();
+    });
   }
   function initAiPanel(){
     var cfg = loadApiConfig();
-    bindProvider("imgProvider", "imgModel", IMG_PROVIDERS, cfg.imgProvider, cfg.imgModel);
-    bindProvider("txtProvider", "txtModel", TXT_PROVIDERS, cfg.txtProvider, cfg.txtModel);
-    $("imgKey").value = cfg.imgKey || "";
-    $("txtKey").value = cfg.txtKey || "";
-    $("imgKey").addEventListener("input", persistApiConfig);
-    $("txtKey").addEventListener("input", persistApiConfig);
+    apiKeys = cfg.keys || {};
+    // 舊版設定（單一 imgKey／txtKey）搬進金鑰表
+    if(cfg.imgKey && cfg.imgProvider && !apiKeys[cfg.imgProvider]) apiKeys[cfg.imgProvider] = cfg.imgKey;
+    if(cfg.txtKey && cfg.txtProvider && !apiKeys[cfg.txtProvider]) apiKeys[cfg.txtProvider] = cfg.txtKey;
+    bindProvider("img", IMG_PROVIDERS, cfg.imgProvider, cfg.imgModel);
+    bindProvider("txt", TXT_PROVIDERS, cfg.txtProvider, cfg.txtModel);
     updateAiBadge();
   }
-  function getImgCreds(){ return {provider:$("imgProvider").value, model:$("imgModel").value.trim(), apiKey:$("imgKey").value.trim()}; }
-  function getTxtCreds(){
-    var c = {provider:$("txtProvider").value, model:$("txtModel").value.trim(), apiKey:$("txtKey").value.trim()};
-    if(!c.apiKey && c.provider === $("imgProvider").value) c.apiKey = $("imgKey").value.trim();
-    return c;
-  }
+  function getImgCreds(){ var p = $("imgProvider").value; return {provider:p, model:$("imgModel").value.trim(), apiKey:apiKeys[p] || ""}; }
+  function getTxtCreds(){ var p = $("txtProvider").value; return {provider:p, model:$("txtModel").value.trim(), apiKey:apiKeys[p] || ""}; }
   function updateAiBadge(){
     var b = $("aiStatusBadge");
-    var img = !!$("imgKey").value.trim(), txt = !!getTxtCreds().apiKey;
+    var img = !!getImgCreds().apiKey, txt = !!getTxtCreds().apiKey;
     b.className = "badge" + (img ? " ok" : "");
     b.textContent = img && txt ? "圖像＋文字已設定" : img ? "圖像已設定" : txt ? "僅文字已設定" : "未設定（可用手動模式）";
   }
@@ -605,6 +644,22 @@
       }
       var why = ps.map(function(p){ return p.text || ""; }).join("").slice(0, 200) || (cand && cand.finishReason) || (d.promptFeedback && d.promptFeedback.blockReason) || "未知原因";
       throw new Error("模型沒有回傳圖片：" + why);
+    }
+    if(creds.provider === "openrouter"){
+      var content = [{type:"text", text:prompt}];
+      if(refDataUrl) content.push({type:"image_url", image_url:{url:refDataUrl}});
+      var orBody = {model:creds.model, messages:[{role:"user", content:content}], modalities:["image","text"], image_config:{aspect_ratio:grid.aspect}};
+      var orRes = await fetchJsonWithRetry("https://openrouter.ai/api/v1/chat/completions", {method:"POST",
+        headers:{"content-type":"application/json", "authorization":"Bearer " + creds.apiKey, "X-Title":"LINE Sticker Studio"},
+        body:JSON.stringify(orBody)}, onRetry);
+      var msg = orRes.choices && orRes.choices[0] && orRes.choices[0].message;
+      var imgs = (msg && msg.images) || [];
+      for(var j = 0; j < imgs.length; j++){
+        var u = imgs[j].image_url && imgs[j].image_url.url;
+        if(u) return u;
+      }
+      var orWhy = (msg && typeof msg.content === "string" && msg.content.slice(0, 200)) || (orRes.choices && orRes.choices[0] && orRes.choices[0].finish_reason) || "未知原因";
+      throw new Error("模型沒有回傳圖片（請確認選的是會輸出圖片的模型）：" + orWhy);
     }
     if(creds.provider === "openai"){
       var res;

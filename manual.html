@@ -48,9 +48,10 @@
     <h2><span class="n">0</span>AI 連線設定（選用）</h2>
     <div class="table-wrap"><table>
       <tr><th>用途</th><th>預設服務商／模型</th><th>說明</th></tr>
-      <tr><td>圖像生成</td><td>Gemini／<code>gemini-3.1-flash-image</code></td><td>也可以改用 OpenAI <code>gpt-image-1</code>。有參考圖時會一起送出，讓每格角色長得一樣。</td></tr>
-      <tr><td>台詞改寫</td><td>Gemini／<code>gemini-3.5-flash</code></td><td>也支援 Claude、OpenAI、OpenRouter。金鑰留空時，服務商相同就沿用圖像金鑰。</td></tr>
+      <tr><td>圖像生成</td><td>Gemini／<code>gemini-3.1-flash-image</code></td><td>也可以改用 <b>OpenRouter</b>（預設 <code>google/gemini-3.1-flash-image</code>，模型欄有建議清單，也能選 Gemini Pro 或 GPT 圖像模型）或 OpenAI <code>gpt-image-1</code>。有參考圖時會一起送出，讓每格角色長得一樣。</td></tr>
+      <tr><td>台詞改寫</td><td>Gemini／<code>gemini-3.5-flash</code></td><td>也支援 OpenRouter、Claude、OpenAI。</td></tr>
     </table></div>
+    <p><b>金鑰依服務商分開保存</b>：切換服務商不會洗掉其他家的金鑰；圖像和文字選同一家時自動共用同一把。只有一把 OpenRouter 金鑰的話，兩邊都選 OpenRouter 就好。每個金鑰欄下方都有申請連結。</p>
     <p>金鑰只存在你自己瀏覽器的 localStorage，不會上傳到其他地方。使用的是你自己的 API 額度，生圖會產生費用。</p>
   </section>
 
