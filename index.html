@@ -64,6 +64,14 @@
   textarea{resize:vertical;}
   .key-link{font-size:12px;color:var(--accent-dark);text-decoration:none;align-self:flex-end;}
   .key-link:hover{text-decoration:underline;}
+  .prompt-gen{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line);}
+  .prompt-gen h3{margin-top:0;}
+  .prompt-gen-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;}
+  .prompt-block{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:10px 12px;margin-top:10px;}
+  .prompt-block header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+  .prompt-block header b{font-size:14px;}
+  .prompt-block textarea{font-family:Consolas,"Noto Sans TC",monospace;font-size:12.5px;height:170px;}
+  .prompt-block .meta{font-size:12px;color:var(--dim);}
   .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
   .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;}
   .stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
@@ -215,6 +223,7 @@
               </select>
             </div>
             <div class="field"><label for="keyColor">生圖背景（去背用）</label><select id="keyColor"></select></div>
+            <div class="field"><label for="batchSize">每批格數</label><select id="batchSize"></select></div>
           </div>
         </div>
         <div>
@@ -228,6 +237,19 @@
             <button class="btn small danger" id="refClear" type="button" hidden>移除參考圖</button>
           </div>
         </div>
+      </div>
+      <div class="prompt-gen">
+        <h3>產生提示詞：貼到其他 AI 用，不花 API token</h3>
+        <p class="hint">選好上面的條件後，可以把提示詞複製到 ChatGPT、Gemini、Claude 等聊天網頁版使用，不必在這裡填金鑰。建議流程：① 台詞企劃提示詞 → 把 AI 回覆貼回來匯入 → ② 生圖提示詞（會用匯入後的台詞），連同角色參考圖一起貼到 Gemini 或 ChatGPT 生圖 → 到步驟 3 上傳生好的網格圖。</p>
+        <div class="prompt-gen-bar">
+          <div class="field" style="margin:0;min-width:200px;"><label for="promptCompact">提示詞長度</label>
+            <select id="promptCompact"><option value="0">完整版（效果較穩）</option><option value="1">精簡版（省 token）</option></select>
+          </div>
+          <button class="btn" id="genPhrasePromptBtn" type="button">① 台詞企劃提示詞</button>
+          <button class="btn" id="genImagePromptBtn" type="button">② 生圖提示詞（全部批次）</button>
+          <button class="btn" id="downloadPromptsBtn" type="button">下載全部提示詞 .txt</button>
+        </div>
+        <div id="promptOut"></div>
       </div>
       <div class="step-nav"><span></span><button class="btn primary" data-go="2" type="button">下一步：台詞設定 →</button></div>
     </div>
@@ -258,9 +280,7 @@
     <div class="panel">
       <h2>3. 生成貼圖網格</h2>
       <p class="hint">每一批會生成一張「多格網格圖」，同一張圖裡的角色比較一致。分批越多，每格畫得越細，但要呼叫越多次。</p>
-      <div class="grid-3" style="margin-bottom:6px;">
-        <div class="field"><label for="batchSize">每批格數</label><select id="batchSize"></select></div>
-      </div>
+      <p class="hint" id="batchInfo" style="margin-bottom:10px;"></p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn primary" id="genAllBtn" type="button">全部 AI 自動生成</button>
         <button class="btn" id="demoBtn" type="button">產生示範網格（不用金鑰，試切割用）</button>
@@ -461,7 +481,7 @@
 
   /* ================= 設定保存 ================= */
   var SETTING_IDS = ["theme","langMode","artStyle","stickerCount","exaggeration","textMode","keyColor","batchSize",
-    "cutTol","cutKeyMode","cutTrim","cutGutter","cutDespeckle","txtFont","txtPos","txtFill","txtStroke","txtStrokeW","txtSize"];
+    "promptCompact","cutTol","cutKeyMode","cutTrim","cutGutter","cutDespeckle","txtFont","txtPos","txtFill","txtStroke","txtStrokeW","txtSize"];
   function collectSettings(){
     var s = {};
     SETTING_IDS.forEach(function(id){ s[id] = $(id).value; });
@@ -479,6 +499,7 @@
   }
   function persistSettings(){
     try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(collectSettings())); }catch(e){}
+    if(typeof refreshShownPrompts === "function") refreshShownPrompts();
   }
   function loadSettings(){
     try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || null; }catch(e){ return null; }
@@ -764,13 +785,19 @@
     if(a < 0 || b <= a) throw new Error("AI 回傳的格式無法解析");
     return JSON.parse(t.slice(a, b + 1));
   }
-  async function aiRewritePhrases(){
-    var creds = getTxtCreds();
-    if(!creds.apiKey){ $("aiPanel").open = true; toast("請先在上方「AI 連線設定」填入文字模型金鑰"); return; }
-    var theme = $("theme").value.trim();
-    if(!theme){ toast("請先在步驟 1 輸入貼圖主題"); showStep(1); return; }
+  function isCompact(){ return $("promptCompact").value === "1"; }
+  function buildPhrasePrompt(){
+    var theme = $("theme").value.trim() || "可愛的原創角色";
     var n = count(), mode = LANG_MODES[$("langMode").value];
-    var prompt = [
+    if(isCompact()){
+      return [
+        "LINE 貼圖台詞企劃。主題：" + theme + "。語言風格：" + mode.label + "（" + mode.desc + "）。",
+        "產生 " + n + " 句聊天常用短句（中文 2-7 字／英文 1-4 字／日文 2-8 字），涵蓋招呼、道謝、道歉、答應、拒絕與各種情緒，融入主題特色，不重複、不用 emoji。",
+        "每句附英文 pose（10-20 字，表情＋動作）。",
+        '只輸出 JSON：[{"text":"","pose":""}]'
+      ].join("\n");
+    }
+    return [
       "你是專業的 LINE 貼圖企劃。",
       "貼圖主題／角色：" + theme,
       "台詞語言風格：" + mode.label + "（" + mode.desc + "）",
@@ -784,22 +811,33 @@
       "只輸出 JSON 陣列本身，不要 markdown，不要其他文字，格式：",
       '[{"text":"台詞","pose":"english pose description"}]'
     ].join("\n");
+  }
+  // 把 AI 回傳的台詞 JSON 套進表格，回傳實際套用句數
+  function applyPhraseReply(raw){
+    var arr = parseJsonArray(raw).filter(function(x){ return x && x.text; });
+    if(!arr.length) throw new Error("AI 沒有回傳台詞");
+    var defs = defaultPhrases();
+    state.phrases = defs.map(function(d, i){
+      var x = arr[i];
+      return x ? {text: String(x.text).trim().slice(0, 24), pose: String(x.pose || d.pose).trim()} : d;
+    });
+    renderPhrases();
+    return Math.min(arr.length, defs.length);
+  }
+  async function aiRewritePhrases(){
+    var creds = getTxtCreds();
+    if(!creds.apiKey){ $("aiPanel").open = true; toast("請先在上方「AI 連線設定」填入文字模型金鑰，或到步驟 1 產生提示詞貼到聊天 AI"); return; }
+    if(!$("theme").value.trim()){ toast("請先在步驟 1 輸入貼圖主題"); showStep(1); return; }
+    var n = count();
     var btn = $("aiPhrasesBtn");
     btn.disabled = true;
     $("phraseStatus").textContent = "呼叫 " + TXT_PROVIDERS[creds.provider].label + " 中…";
     try{
-      var raw = await callLLM(creds.provider, creds.model, creds.apiKey, prompt, function(a, s, w){
+      var raw = await callLLM(creds.provider, creds.model, creds.apiKey, buildPhrasePrompt(), function(a, s, w){
         $("phraseStatus").textContent = "服務忙碌（" + s + "），" + w + " 秒後第 " + (a + 1) + " 次嘗試…";
       });
-      var arr = parseJsonArray(raw).filter(function(x){ return x && x.text; });
-      if(!arr.length) throw new Error("AI 沒有回傳台詞");
-      var defs = defaultPhrases();
-      state.phrases = defs.map(function(d, i){
-        var x = arr[i];
-        return x ? {text: String(x.text).trim().slice(0, 24), pose: String(x.pose || d.pose).trim()} : d;
-      });
-      renderPhrases();
-      $("phraseStatus").textContent = "已依主題改寫 " + Math.min(arr.length, n) + " 句" + (arr.length < n ? "（不足的用預設補上）" : "");
+      var got = applyPhraseReply(raw);
+      $("phraseStatus").textContent = "已依主題改寫 " + got + " 句" + (got < n ? "（不足的用預設補上）" : "");
     }catch(e){
       $("phraseStatus").textContent = "";
       toast("AI 改寫失敗：" + e.message);
@@ -837,6 +875,20 @@
     var key = KEYS[$("keyColor").value], style = STYLES[$("artStyle").value], ex = EXAGGERATION[$("exaggeration").value];
     var textMode = $("textMode").value, theme = $("theme").value.trim() || "a cute original mascot";
     var lines = [];
+    if(isCompact()){
+      lines.push("ONE image: LINE sticker sheet, grid " + b.cols + "x" + b.rows + " = " + b.n + " stickers, the same character in every cell" + (state.refImage ? " (match the attached reference exactly)." : "."));
+      lines.push("Theme: " + theme);
+      lines.push("Style: " + style.prompt + ". Expressions: " + ex.prompt + ".");
+      lines.push("Each character centered in its cell with margin, not cropped; no grid lines or borders.");
+      lines.push("Background: flat " + key.prompt + ", no shadows. " + key.avoid);
+      lines.push(textMode === "ai" ? "Caption under each character, exact text, bold font, white outline." : "No text at all.");
+      lines.push("Cells (left to right, top to bottom):");
+      for(var k = 0; k < b.n; k++){
+        var q = state.phrases[b.start + k];
+        if(q) lines.push((k + 1) + ". " + q.pose + ' | "' + q.text + '"');
+      }
+      return lines.join("\n");
+    }
     lines.push("Create ONE image: a LINE messenger sticker sheet laid out as a grid of " + b.cols + " columns x " + b.rows + " rows, containing " + b.n + " separate stickers of the same character.");
     lines.push(state.refImage
       ? "Character: exactly the character in the attached reference image. Keep the identical face, colors, outfit, proportions and details in every cell."
@@ -867,6 +919,8 @@
   function renderBatches(){
     ensurePhraseCount();
     planBatches();
+    var g0 = state.batches[0];
+    $("batchInfo").textContent = "每批 " + g0.n + " 格（" + g0.cols + "×" + g0.rows + "），共 " + state.batches.length + " 批。要改格數請回步驟 1。";
     var list = $("batchList");
     list.innerHTML = "";
     state.batches.forEach(function(b, i){
@@ -1005,6 +1059,84 @@
     state.results = [];
     renderBatches();
     $("genNotice").innerHTML = '<div class="notice ok">已產生示範網格，到步驟 4 按「執行切割」看看效果。</div>';
+  }
+
+  /* ================= 步驟 1：產生提示詞（貼到其他 AI 用） ================= */
+  function promptBlock(title, meta, text){
+    var box = document.createElement("div");
+    box.className = "prompt-block";
+    box.innerHTML = '<header><b></b><span class="meta"></span><button class="btn small primary" type="button">複製</button></header><textarea readonly></textarea>';
+    box.querySelector("b").textContent = title;
+    box.querySelector(".meta").textContent = meta;
+    box.querySelector("textarea").value = text;
+    box.querySelector("button").addEventListener("click", function(){ copyText(text); });
+    return box;
+  }
+  function approxTokens(t){
+    // 粗估：中日文約 1 字 1 token，其他約 4 字元 1 token
+    var cjk = (t.match(/[぀-ヿ㐀-鿿＀-￯]/g) || []).length;
+    return Math.round(cjk + (t.length - cjk) / 4);
+  }
+  var lastPromptKind = null;
+  // 條件改變時，已顯示的提示詞跟著更新（保留已貼上的 AI 回覆）
+  function refreshShownPrompts(){
+    if(lastPromptKind === "phrase"){
+      var kept = $("phraseReply") ? $("phraseReply").value : "";
+      showPhrasePrompt();
+      $("phraseReply").value = kept;
+    } else if(lastPromptKind === "image") showImagePrompts();
+  }
+  function showPhrasePrompt(){
+    lastPromptKind = "phrase";
+    ensurePhraseCount();
+    var out = $("promptOut"), text = buildPhrasePrompt();
+    out.innerHTML = "";
+    out.appendChild(promptBlock("① 台詞企劃提示詞", "約 " + approxTokens(text) + " tokens · 貼到任一聊天 AI", text));
+    var imp = document.createElement("div");
+    imp.className = "prompt-block";
+    imp.innerHTML = '<header><b>把 AI 的回覆貼回這裡</b><span class="meta">整段貼上即可，會自動抓出 JSON</span></header>' +
+      '<textarea id="phraseReply" placeholder="[{&quot;text&quot;:&quot;哈囉～&quot;,&quot;pose&quot;:&quot;waving ...&quot;}, ...]"></textarea>' +
+      '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn primary small" id="importPhraseBtn" type="button">匯入台詞</button></div>';
+    out.appendChild(imp);
+    $("importPhraseBtn").addEventListener("click", function(){
+      try{
+        var got = applyPhraseReply($("phraseReply").value);
+        toast("已匯入 " + got + " 句台詞，可到步驟 2 檢查");
+        showImagePrompts();
+      }catch(e){ toast("匯入失敗：" + e.message); }
+    });
+  }
+  function showImagePrompts(){
+    lastPromptKind = "image";
+    ensurePhraseCount();
+    planBatches();
+    var out = $("promptOut");
+    out.innerHTML = "";
+    var note = document.createElement("div");
+    note.className = "notice " + (state.refImage ? "ok" : "warn");
+    note.textContent = state.refImage
+      ? "共 " + state.batches.length + " 段，每段生成一張網格圖。貼到 Gemini 或 ChatGPT 時，記得每段都要附上角色參考圖，角色才會一致。"
+      : "共 " + state.batches.length + " 段。還沒上傳角色參考圖，AI 會自己設計角色；分批生成時角色可能長得不一樣，建議先產生第 1 批，再把那張圖當參考圖附給後面的批次。";
+    out.appendChild(note);
+    state.batches.forEach(function(b, i){
+      var text = buildImagePrompt(b);
+      out.appendChild(promptBlock("② " + batchTitle(b, i), "約 " + approxTokens(text) + " tokens", text));
+    });
+  }
+  function downloadAllPrompts(){
+    ensurePhraseCount();
+    planBatches();
+    var parts = ["LINE 貼圖提示詞", "主題：" + ($("theme").value.trim() || "（未填）"), "語言模式：" + LANG_MODES[$("langMode").value].label + "　畫風：" + STYLES[$("artStyle").value].label + "　張數：" + count(), ""];
+    parts.push("==================== ① 台詞企劃提示詞 ====================", buildPhrasePrompt(), "");
+    parts.push("（目前台詞）", state.phrases.map(function(p, i){ return pad2(i + 1) + ". " + p.text + "｜" + p.pose; }).join("\n"), "");
+    state.batches.forEach(function(b, i){
+      parts.push("==================== ② " + batchTitle(b, i) + " ====================", buildImagePrompt(b), "");
+    });
+    var blob = new Blob([parts.join("\n")], {type:"text/plain;charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+    var name = ($("theme").value.trim().split(/[，,。\s]/)[0] || "貼圖").slice(0, 20);
+    downloadDataUrl(url, name + "-提示詞.txt");
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
   }
 
   /* ================= 步驟 4：切割 ================= */
@@ -1469,7 +1601,7 @@
 
     $("stickerCount").addEventListener("change", function(){ refreshBatchSizeOptions(); ensurePhraseCount(); renderPhrases(); persistSettings(); });
     $("langMode").addEventListener("change", function(){
-      state.phrases = defaultPhrases(); renderPhrases();
+      state.phrases = defaultPhrases(); renderPhrases(); refreshShownPrompts();
       toast("已套用「" + LANG_MODES[$("langMode").value].label + "」的預設台詞");
     });
     $("keyColor").addEventListener("change", function(){
@@ -1493,6 +1625,9 @@
     $("refClear").addEventListener("click", function(){ setRefImage(null); });
 
     $("batchSize").addEventListener("change", function(){ renderBatches(); });
+    $("genPhrasePromptBtn").addEventListener("click", showPhrasePrompt);
+    $("genImagePromptBtn").addEventListener("click", showImagePrompts);
+    $("downloadPromptsBtn").addEventListener("click", downloadAllPrompts);
     $("genAllBtn").addEventListener("click", generateAll);
     $("demoBtn").addEventListener("click", generateDemo);
 

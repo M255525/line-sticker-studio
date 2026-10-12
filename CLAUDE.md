@@ -6,6 +6,7 @@
 - **尚未部署**：只有本機 git，沒有遠端、沒有 GitHub Pages、沒有序號授權。依使用者偏好，新工具上線前要先問過。
 - BYOK：圖像（Gemini `gemini-3.1-flash-image`／OpenRouter `google/gemini-3.1-flash-image`／OpenAI `gpt-image-1`）與文字（Gemini/OpenRouter/Claude/OpenAI，沿用 food-calorie-tracker 的 callLLM 格式）分開選服務商；**金鑰依服務商存在 `keys` 表**（`lineStickerStudioApiConfig.keys`），兩邊選同一家就共用；舊版 `imgKey/txtKey` 會在載入時自動搬進去。設定值存在 `lineStickerStudioSettings`。
 - OpenRouter 圖像：`chat/completions` 加 `modalities:["image","text"]` 與 `image_config.aspect_ratio`，圖片從 `choices[0].message.images[].image_url.url`（data URL）取出。模型 ID 用 `curl https://openrouter.ai/api/v1/models` 篩選 `output_modalities` 含 image 的模型來確認（2026-10-12 已確認）。假金鑰測試回 401，代表 CORS 和請求路徑都正常。
+- **步驟 1「產生提示詞」**（2026-10-12 加入）：`buildPhrasePrompt()`／`buildImagePrompt(b)` 同時給 API 呼叫和手動複製用；`promptCompact`（精簡版）會一併影響兩者。台詞回覆用 `applyPhraseReply(raw)` 匯入，`parseJsonArray` 可容忍前後的說明文字和 ```json 標記。條件改變時 `persistSettings` 會呼叫 `refreshShownPrompts` 重新產生已顯示的提示詞。「每批格數」`batchSize` 已從步驟 3 移到步驟 1。
 - 頂部跑馬燈共用工作區公告 GAS（滑鼠移入會暫停）。
 
 ## 架構重點
