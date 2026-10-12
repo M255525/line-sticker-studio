@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>貼圖助手使用說明</title>
+<link rel="icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#f5f2ea;--panel:#fff;--ink:#2b2622;--dim:#6f665e;--line:#e2dacb;--accent:#1f9d6b;--soft:#e6f5ee;--amber-soft:#fdf3e1;--amber:#b7791f;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.75;font-size:15px;}
+  main{max-width:860px;margin:0 auto;padding:24px 16px 80px;}
+  h1{font-size:24px;font-weight:900;margin:0 0 4px;}
+  .sub{color:var(--dim);margin:0 0 20px;}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px;}
+  h2{font-size:18px;margin:0 0 8px;font-weight:900;display:flex;gap:10px;align-items:center;}
+  h2 .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:14px;flex:none;}
+  ul,ol{padding-left:22px;margin:6px 0;}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px;}
+  th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top;}
+  th{color:var(--dim);font-size:13px;}
+  .tip{background:var(--soft);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px;}
+  .warn{background:var(--amber-soft);color:var(--amber);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px;}
+  a.back{display:inline-block;margin-bottom:14px;color:var(--accent);font-weight:700;text-decoration:none;}
+  code{background:#f1ede4;border-radius:5px;padding:1px 5px;font-size:13px;}
+  .table-wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="index.html">← 回到貼圖助手</a>
+  <h1>LINE 貼圖自動化助手：使用說明</h1>
+  <p class="sub">給一個主題和一張角色圖，產出 8／16／24 張符合 LINE Creators Market 規格的透明 PNG，打包成 ZIP 就能上傳。</p>
+
+  <section>
+    <h2>整體流程</h2>
+    <ol>
+      <li><b>主題與角色</b>：寫主題、上傳角色參考圖，挑語言模式和畫風。</li>
+      <li><b>台詞設定</b>：系統依語言模式自動帶入常用台詞，可以手改，也可以讓 AI 依主題改寫。</li>
+      <li><b>生成貼圖</b>：AI 一次畫一張多格「網格圖」（例如 4×3＝12 格），24 張分 2 批完成。</li>
+      <li><b>切割匯出</b>：自動切格、去背、疊上台詞、縮成規格尺寸，下載 ZIP。</li>
+    </ol>
+    <div class="tip">沒有 API 金鑰也能完整跑完：步驟 3 按「複製提示詞」，到 Gemini 或 ChatGPT 網頁版貼上，<b>記得一起上傳角色參考圖</b>，生好的圖再用「上傳網格圖」放回來就行。</div>
+  </section>
+
+  <section>
+    <h2><span class="n">0</span>AI 連線設定（選用）</h2>
+    <div class="table-wrap"><table>
+      <tr><th>用途</th><th>預設服務商／模型</th><th>說明</th></tr>
+      <tr><td>圖像生成</td><td>Gemini／<code>gemini-3.1-flash-image</code></td><td>也可以改用 OpenAI <code>gpt-image-1</code>。有參考圖時會一起送出，讓每格角色長得一樣。</td></tr>
+      <tr><td>台詞改寫</td><td>Gemini／<code>gemini-3.5-flash</code></td><td>也支援 Claude、OpenAI、OpenRouter。金鑰留空時，服務商相同就沿用圖像金鑰。</td></tr>
+    </table></div>
+    <p>金鑰只存在你自己瀏覽器的 localStorage，不會上傳到其他地方。使用的是你自己的 API 額度，生圖會產生費用。</p>
+  </section>
+
+  <section>
+    <h2><span class="n">1</span>常用預設值</h2>
+    <div class="table-wrap"><table>
+      <tr><th>設定</th><th>選項</th></tr>
+      <tr><td>語言模式</td><td>台灣日常口語（預設）、職場上班族、長輩問候、情侶放閃、台語諧音、中英混搭、English、日本語。每種都內建 24 句，依常用程度排序；選 8 張取前 8 句，16 張取前 16 句。</td></tr>
+      <tr><td>畫風</td><td>Q 版可愛（預設）、手繪線條、水彩、扁平插畫、像素風、厚塗。</td></tr>
+      <tr><td>表情誇張度</td><td>自然／生動（預設）／超誇張（會加汗滴、青筋、亮晶晶等漫畫效果）。</td></tr>
+      <tr><td>台詞文字</td><td><b>程式疊字（推薦）</b>：AI 只畫角色，字由程式疊上，中文不會錯字，之後也能隨時改字。<br>讓 AI 直接畫字：字和畫面比較融合，但 AI 很常寫錯中文字。<br>不加文字：純表情貼圖。</td></tr>
+      <tr><td>生圖背景</td><td><b>綠幕（推薦）</b>最好去背；角色本身是綠色時改用洋紅；白底只會從邊緣往內去背，角色裡的白色會保留。</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>台詞設定</h2>
+    <ul>
+      <li>「台詞」是貼圖上會出現的字；「動作／表情描述」是給圖像模型看的英文提示，可以改成更符合角色的動作（例如加上道具）。</li>
+      <li>「AI 依主題改寫台詞」會依角色主題調整台詞和動作，例如上班族柴犬就會出現「打卡」「加班」類的用語。</li>
+      <li>換語言模式時，台詞會重設成該模式的預設值。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>生成貼圖網格</h2>
+    <ul>
+      <li><b>每批格數</b>：24 張預設每批 12 格（4×3，共 2 批）。每批 8 格畫得最細但要呼叫 3 次；24 格一次完成最快，但每格比較小。</li>
+      <li>某一批畫得不好，可以單獨重按那一批的「AI 生成」。</li>
+      <li>「下載原圖」可以把網格圖存下來，以後直接上傳重切。</li>
+      <li>「產生示範網格」是用程式畫的假角色，讓你在沒有金鑰時先試試切割流程。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>切割與匯出</h2>
+    <ul>
+      <li>預覽圖上的紅色虛線就是切割線。如果 AI 畫的圖外圈有留白或格子之間有間距，調整「外框內縮」「格線間距」讓虛線對準每一格。</li>
+      <li><b>去背容差</b>：背景沒去乾淨就調高；角色邊緣被吃掉就調低。</li>
+      <li><b>雜點清除</b>：會清掉從鄰格跨過來的殘影和小噪點。如果角色旁邊的小道具（愛心、汗滴）被誤刪，就把它關掉。</li>
+      <li>每張貼圖下方可以直接改台詞，改完會立即重新疊字。</li>
+      <li>點 ☆ 指定主要圖片，main.png（240×240）和 tab.png（96×74）會自動用那張角色產生（不含文字）。</li>
+    </ul>
+    <div class="tip">ZIP 內容：<code>01.png</code>～<code>24.png</code>、<code>main.png</code>、<code>tab.png</code>，可以直接上傳到 LINE Creators Market。</div>
+  </section>
+
+  <section>
+    <h2>LINE 貼圖規格對照</h2>
+    <div class="table-wrap"><table>
+      <tr><th>項目</th><th>規格</th><th>本工具處理方式</th></tr>
+      <tr><td>貼圖</td><td>最大 370×320、寬高偶數、PNG、1MB 以下</td><td>自動縮放、裁掉多餘透明邊、留 10px 邊距、強制取偶數，不符合的會標紅</td></tr>
+      <tr><td>主要圖片</td><td>240×240</td><td>自動產生 main.png</td></tr>
+      <tr><td>聊天室標籤</td><td>96×74</td><td>自動產生 tab.png</td></tr>
+      <tr><td>張數</td><td>8／16／24／32／40</td><td>支援 8／16／24</td></tr>
+    </table></div>
+    <div class="warn">上架前請自行確認：角色不是別人的版權角色、參考圖有使用權、台詞不違反 LINE 的審核準則。規格以 LINE Creators Market 官方最新公告為準。</div>
+  </section>
+
+  <section>
+    <h2>專案存檔</h2>
+    <p>右上角「儲存專案」會把主題、設定、台詞、參考圖和網格圖存成一個 .json 檔，「開啟專案」可以載回來繼續修改。檔案只存在你的電腦裡。</p>
+  </section>
+</main>
+</body>
+</html>
