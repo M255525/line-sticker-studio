@@ -17,6 +17,7 @@
 - 切割管線（`runCut`）：`cellRects` 平均切格 → `detectBg`（取整張圖外框像素的中位數當背景色，不寫死 #00FF00）→ `keyOut`（global 或 flood；半透明邊緣做 unpremultiply，綠幕另外做 despill）→ `despeckle`（連通元件，刪掉小噪點和碰到邊緣的鄰格殘影）→ `alphaBounds` 裁切 → `composeSticker`（疊字、裁到內容＋10px、強制偶數）。
 - main/tab 由主要圖片的 `charCanvas`（不含文字）`fitInto` 產生（`buildMainTab`）。
 - **LINE 規格強制**（`LINE_SPEC`，依 creator.line.me/en/guideline/sticker/，2026-10-12 確認）：`composeSticker` 最後用 `padToLineSize` 把內容置中放進「內容＋10px」的偶數尺寸畫布（最大 370×320）；`encodeLinePng` 在 IHDR 後寫入 72dpi 的 pHYs（canvas.toBlob 本身不帶 dpi）；`validateLineImage` 讀回 PNG 檔頭檢查尺寸、偶數、RGB 8bit、dpi、≤1MB，並檢查四邊 margin−1 px 帶狀區域全透明；`specReport`／`renderSpecReport` 列出 10 項檢查，**任一項不合格就停用 ZIP 下載**（含缺圖、ZIP 超過 60MB）。已用 PIL 獨立驗證過 ZIP 內 26 個檔案。
+- **勾選下載**（2026-11-02）：每張結果卡上方有「下載」勾選框，取消勾選設 `r.skip=true`（存在 result 物件上，改台詞重疊字不會丟失，重新切割會重置）；`pickedIndexes()` 回傳要下載的索引，`setPick(fn)` 給「全選／全不選／只選符合規格」用。`specReport` 只檢查勾選的圖，缺圖／取消勾選的格子不擋下載；張數列不是 8/16/24/32/40 時標 `soft:true`（⚠ 可下載自用、提醒不能直接上架），0 張才停用。`downloadZip` 依勾選順序重新編號 01～k。SW 快取 v3。
 - 測試掛鉤：`window._sticker`（state、runCut、generateDemo、showStep、buildImagePrompt）。「產生示範網格」用程式畫的角色，不需要金鑰就能驗證切割流程。
 
 ## 驗證紀錄（2026-10-12）

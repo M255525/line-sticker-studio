@@ -135,6 +135,12 @@
   .sticker .meta b{color:var(--ink);}
   .sticker input{border:none;border-top:1px solid var(--line-soft);border-radius:0;font-size:13px;padding:6px 8px;}
   .sticker .empty-cell{color:var(--warn);font-size:12px;padding:10px;text-align:center;}
+  .sticker .pick{display:flex;align-items:center;gap:6px;padding:6px 8px;font-size:12px;font-weight:700;color:var(--ink);border-bottom:1px solid var(--line-soft);cursor:pointer;user-select:none;}
+  .sticker .pick input{width:auto;margin:0;border:none;padding:0;accent-color:var(--accent);}
+  .sticker.skip{opacity:.45;}
+  .sticker.skip .pick{color:var(--dim);}
+  .pick-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  .pick-bar .hint{margin:0;}
   .export-row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;}
   .export-thumb{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/12px 12px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;padding:6px;}
   .export-thumb img{display:block;}
@@ -370,6 +376,12 @@
         <span id="cutStatus" class="hint" style="margin:0;align-self:center;"></span>
       </div>
       <div id="cutNotice"></div>
+      <div class="pick-bar" id="pickBar" hidden>
+        <button class="btn small" type="button" id="pickAll">全選</button>
+        <button class="btn small" type="button" id="pickNone">全不選</button>
+        <button class="btn small" type="button" id="pickOk">只選符合規格</button>
+        <span class="hint" id="pickInfo"></span>
+      </div>
       <div class="result-grid" id="resultGrid" style="margin-top:12px;"></div>
     </div>
 
@@ -1779,21 +1791,24 @@
         card.className = "sticker";
         if(!r || r.empty || !r.url){
           missing++;
-          card.classList.add("bad");
-          card.innerHTML = '<div class="pic"><div class="empty-cell">' + (r && r.empty ? "這格偵測不到角色" : "尚未切割（缺少網格圖）") + '</div></div><div class="meta"><b>' + pad2(i + 1) + '</b></div>';
+          card.classList.add("bad", "skip");
+          card.innerHTML = '<label class="pick"><input type="checkbox" disabled>無法下載</label><div class="pic"><div class="empty-cell">' + (r && r.empty ? "這格偵測不到角色" : "尚未切割（缺少網格圖）") + '</div></div><div class="meta"><b>' + pad2(i + 1) + '</b></div>';
           grid.appendChild(card);
           return;
         }
         if(r.ok) okCount++; else { bad++; card.classList.add("bad"); }
+        if(r.skip) card.classList.add("skip");
         if(i === state.mainIndex) card.classList.add("is-main");
-        card.innerHTML = '<div class="pic"><img alt="貼圖 ' + (i + 1) + '"></div>' +
+        card.innerHTML = '<label class="pick" title="取消勾選＝這張不放進 ZIP"><input type="checkbox"' + (r.skip ? "" : " checked") + '>' + (r.skip ? "不下載" : "下載") + '</label>' +
+          '<div class="pic"><img alt="貼圖 ' + (i + 1) + '"></div>' +
           '<div class="meta"><b>' + pad2(i + 1) + '</b><span>' + r.w + '×' + r.h + ' · ' + Math.round(r.blob.size / 1024) + 'KB</span>' +
           '<button class="btn small" type="button" title="設為主要圖片">' + (i === state.mainIndex ? "★" : "☆") + '</button></div>' +
           (r.issues.length ? '<div class="empty-cell">' + r.issues.join("、") + '</div>' : '') +
           ($("textMode").value === "canvas" ? '<input type="text" maxlength="24" title="修改台詞後會立即重新疊字">' : '');
         card.querySelector("img").src = r.url;
         card.querySelector("button").addEventListener("click", function(){ state.mainIndex = i; renderResults(); });
-        var inp = card.querySelector("input");
+        card.querySelector(".pick input").addEventListener("change", function(){ r.skip = !this.checked; renderResults(); });
+        var inp = card.querySelector('input[type="text"]');
         if(inp){
           inp.value = p.text;
           inp.addEventListener("change", async function(){
@@ -1807,9 +1822,22 @@
       })(i);
     }
     var notice = $("cutNotice");
-    if(okCount === n) notice.innerHTML = '<div class="notice ok">' + n + ' 張全部符合 LINE 規格。點 ☆ 可以指定主要圖片，下方可以下載 ZIP。</div>';
-    else notice.innerHTML = '<div class="notice warn">符合規格 ' + okCount + '／' + n + ' 張' + (missing ? "，" + missing + " 格沒有角色或缺圖" : "") + (bad ? "，" + bad + " 張規格有問題" : "") + '。可以調整去背容差、外框內縮後重新切割，或回步驟 3 重新生成該批。</div>';
+    if(okCount === n) notice.innerHTML = '<div class="notice ok">' + n + ' 張全部符合 LINE 規格。點 ☆ 可以指定主要圖片；不想下載的圖片取消勾選即可，下方可以下載 ZIP。</div>';
+    else notice.innerHTML = '<div class="notice warn">符合規格 ' + okCount + '／' + n + ' 張' + (missing ? "，" + missing + " 格沒有角色或缺圖" : "") + (bad ? "，" + bad + " 張規格有問題" : "") + '。可以調整去背容差、外框內縮後重新切割、回步驟 3 重新生成該批，或取消勾選有問題的圖片不下載。</div>';
+    var avail = state.results.filter(function(r){ return r && r.blob; }).length;
+    $("pickBar").hidden = !avail;
+    $("pickInfo").textContent = "已勾選 " + pickedIndexes().length + "／" + avail + " 張要下載（ZIP 會依序重新編號 01、02…）";
     renderExport();
+  }
+  // 有切出圖片且沒被取消勾選的索引
+  function pickedIndexes(){
+    var out = [];
+    for(var i = 0; i < count(); i++){ var r = state.results[i]; if(r && r.blob && !r.skip) out.push(i); }
+    return out;
+  }
+  function setPick(fn){
+    state.results.forEach(function(r){ if(r && r.blob) r.skip = !fn(r); });
+    renderResults();
   }
   function renderExport(){
     var n = count(), sel = $("mainIndex");
@@ -1841,15 +1869,18 @@
   function specReport(){
     var n = count(), rs = [];
     for(var i = 0; i < n; i++) rs.push(state.results[i]);
-    var have = rs.filter(function(r){ return r && r.blob; });
-    // 缺圖只在「張數」那列列出；其他列只檢查已產生的圖
-    var missing = rs.map(function(r, i){ return (!r || !r.blob) ? pad2(i + 1) : null; }).filter(Boolean);
-    var failed = function(test){ return rs.map(function(r, i){ return (r && r.blob && test(r)) ? pad2(i + 1) : null; }).filter(Boolean); };
+    // 只檢查有勾選要下載的圖；取消勾選或缺圖的格子不擋下載
+    var isPicked = function(r){ return r && r.blob && !r.skip; };
+    var have = rs.filter(isPicked);
+    var k = have.length;
+    var failed = function(test){ return rs.map(function(r, i){ return (isPicked(r) && test(r)) ? pad2(i + 1) : null; }).filter(Boolean); };
     var hasIssue = function(word){ return function(r){ return r.issues.some(function(x){ return x.indexOf(word) >= 0; }); }; };
     var mt = state.mainTab;
     var list = [];
     function add(label, bad, extra){ list.push({label:label, ok:!bad.length, detail:bad.length ? "不合格：" + bad.join("、") : (extra || "")}); }
-    add("張數 " + n + " 張（LINE 允許 8／16／24／32／40）", missing.length ? ["缺 " + missing.join("、")] : [], "全部 " + n + " 張都已產生");
+    if(!k) list.push({label:"勾選要下載的貼圖", ok:false, detail:"不合格：目前沒有勾選任何一張"});
+    else if(LINE_SPEC.counts.indexOf(k) >= 0) list.push({label:"張數 " + k + " 張（LINE 允許 8／16／24／32／40）", ok:true, detail:"已勾選 " + k + " 張"});
+    else list.push({label:"張數（LINE 允許 8／16／24／32／40）", ok:false, soft:true, detail:"已勾選 " + k + " 張，不是 LINE 上架張數；仍可下載自用，要上架請補足或刪減到 8／16／24／32／40 張"});
     add("PNG 格式、RGB 色彩模式", failed(hasIssue("RGB")).concat(failed(hasIssue("PNG"))).filter(function(v, i, a){ return a.indexOf(v) === i; }));
     add("尺寸最大 370×320", failed(hasIssue("超過 370")));
     add("寬高皆為偶數", failed(hasIssue("偶數")));
@@ -1863,23 +1894,30 @@
     return list;
   }
   function renderSpecReport(){
-    var list = specReport(), allOk = list.every(function(x){ return x.ok; });
-    var html = '<div class="notice ' + (allOk ? "ok" : "err") + '">' + (allOk
+    var list = specReport();
+    var allOk = list.every(function(x){ return x.ok; });
+    var canDl = list.every(function(x){ return x.ok || x.soft; });
+    var k = pickedIndexes().length;
+    var html = '<div class="notice ' + (allOk ? "ok" : canDl ? "warn" : "err") + '">' + (allOk
       ? "全部通過 LINE Creators Market 規格檢查，可以下載 ZIP 直接上傳。"
-      : "還有項目不符合 LINE 規格，修正前無法下載 ZIP（避免送審被退）。") + '</div><ul class="spec-check">';
+      : canDl ? "勾選的貼圖都符合單張規格，但張數不是 LINE 上架張數：可以下載，但這包不能直接上架。"
+      : "還有項目不符合 LINE 規格，修正前無法下載 ZIP（避免送審被退）。可以取消勾選有問題的圖片。") + '</div><ul class="spec-check">';
     list.forEach(function(x){
-      html += '<li class="' + (x.ok ? "ok" : "bad") + '"><span>' + (x.ok ? "✓" : "✗") + '</span><b>' + escapeHtml(x.label) + '</b>' + (x.detail ? '<small>' + escapeHtml(x.detail) + '</small>' : '') + '</li>';
+      html += '<li class="' + (x.ok ? "ok" : "bad") + '"><span>' + (x.ok ? "✓" : x.soft ? "!" : "✗") + '</span><b>' + escapeHtml(x.label) + '</b>' + (x.detail ? '<small>' + escapeHtml(x.detail) + '</small>' : '') + '</li>';
     });
     $("specSummary").innerHTML = html + '</ul>';
-    $("zipBtn").disabled = !allOk;
+    $("zipBtn").disabled = !canDl;
+    $("zipBtn").textContent = "下載 ZIP（勾選的 " + k + " 張＋main＋tab）";
   }
   async function downloadZip(){
     if(typeof JSZip === "undefined"){ toast("ZIP 元件載入失敗，請確認網路後重新整理"); return; }
     if(!state.mainTab) state.mainTab = await buildMainTab();
     var list = specReport();
-    if(!list.every(function(x){ return x.ok; })){ renderSpecReport(); toast("還有項目不符合 LINE 規格，請先修正"); return; }
-    var zip = new JSZip(), n = count();
-    for(var i = 0; i < n; i++) zip.file(pad2(i + 1) + ".png", state.results[i].blob);
+    if(!list.every(function(x){ return x.ok || x.soft; })){ renderSpecReport(); toast("還有項目不符合 LINE 規格，請先修正或取消勾選"); return; }
+    var picks = pickedIndexes(), n = picks.length, fullSet = list.every(function(x){ return x.ok; });
+    var zip = new JSZip();
+    // 依勾選順序重新編號，LINE 要求 01～N 連號
+    picks.forEach(function(idx, j){ zip.file(pad2(j + 1) + ".png", state.results[idx].blob); });
     zip.file("main.png", state.mainTab.main.blob);
     zip.file("tab.png", state.mainTab.tab.blob);
     var blob = await zip.generateAsync({type:"blob"});
@@ -1888,7 +1926,7 @@
     var url = URL.createObjectURL(blob);
     downloadDataUrl(url, name + "-貼圖.zip");
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-    toast("已下載 " + n + " 張貼圖＋main＋tab（全部符合 LINE 規格）");
+    toast("已下載 " + n + " 張貼圖＋main＋tab" + (fullSet ? "（全部符合 LINE 規格）" : "（張數不是上架張數，僅供自用）"));
   }
 
   /* ================= 專案存檔 ================= */
@@ -2009,6 +2047,9 @@
     $("cutBtn").addEventListener("click", runCut);
     $("mainIndex").addEventListener("change", function(){ state.mainIndex = parseInt($("mainIndex").value, 10); renderResults(); });
     $("zipBtn").addEventListener("click", downloadZip);
+    $("pickAll").addEventListener("click", function(){ setPick(function(){ return true; }); });
+    $("pickNone").addEventListener("click", function(){ setPick(function(){ return false; }); });
+    $("pickOk").addEventListener("click", function(){ setPick(function(r){ return r.ok; }); });
 
     $("saveProjectBtn").addEventListener("click", saveProject);
     $("openProjectBtn").addEventListener("click", function(){ $("projectFile").click(); });
